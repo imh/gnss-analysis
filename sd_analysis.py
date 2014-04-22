@@ -31,7 +31,7 @@ class Aggregator():
 
 def analyze_datum(datum, i, time, ag):
     f2 = datum[~ (np.isnan(datum.L1) | np.isnan(datum.C1))]
-    t_ = utils.datetime2gpst(time) #TODO use a libswiftnav-python version
+    t_ = utils.datetime2gpst(time)  #TODO use a libswiftnav-python version
     sats = list(f2.index)
     numeric_sats = map(lambda x : int(x[1:]), list(sats))
     mgmt.dgnss_update([ag.alm[j] for j in numeric_sats], t_,
@@ -39,11 +39,11 @@ def analyze_datum(datum, i, time, ag):
                 ag.ecef, 1)
 
     # get 'true' resolution from known baseline
-    N_i = mgmt.get_N_from_b(ag.b) #TODO implement
+    N_i = mgmt.get_N_from_b(ag.b)  #TODO implement
     #TODO save it in the Series or DataFrame output, along with its sats
 
-    float_b_error = mgmt.get_float_b() - ag.b #TODO implement
-    resolved_b = mgmt.get_b_from_N(N_i) #TODO implement
+    float_b_error = mgmt.get_float_b() - ag.b  #TODO implement
+    resolved_b = mgmt.get_b_from_N(N_i)  #TODO implement
     float_b_error_NED = cs.wgsecef2ned(float_b_error, ag.ecef)
     resolved_b_NED = cs.wgsecef2ned(resolved_b, ag.ecef)
     ret = pd.Series(np.concatenate((float_b_error_NED, resolved_b_NED)),
@@ -51,8 +51,8 @@ def analyze_datum(datum, i, time, ag):
                             'resolved_b_N',  'resolved_b_E',  'resolved_b_D'])
 
     # check convergence/resolution
-    num_hyps = mgmt.get_ambiguity_num_hyps() #TODO implement
-    num_hyp_sats = mgmt.get_ambiguity_num_hyp_sats() #TODO implement
+    num_hyps = mgmt.get_ambiguity_num_hyps()  #TODO implement
+    num_hyp_sats = mgmt.get_ambiguity_num_hyp_sats()  #TODO implement
 
     float_converged = num_hyp_sats > 0
     resolution_done = float_converged and num_hyps == 1
@@ -65,7 +65,7 @@ def analyze_datum(datum, i, time, ag):
 
     # if the integer ambiguity resolution just finished
     if ag.resolution_started and (not ag.resolution_ended) and resolution_done:
-        n = mgmt.get_ambiguity_n() #TODO implement
+        n = mgmt.get_ambiguity_n()  #TODO implement
         ag.resolution_ended = True
         ag.resolution_time_delta = time - ag.t_0
         ag.resolution_i = i
