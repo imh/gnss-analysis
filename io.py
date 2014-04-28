@@ -36,3 +36,5 @@ def load_data(data_filename):
 
 def load_almanac(almanac_filename):
     return load_yuma(open(almanac_filename))
+
+# def save_analysis(point_analyses, aggregate_analysis, analysis_filename):

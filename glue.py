@@ -25,7 +25,9 @@ def initialize_c_code(ecef, alm, data):
     t0 = data.items[0]
 
     mgmt.dgnss_init([alm[j] for j in numeric_sats], t0,
-                    np.concatenate(([first_data_pt.L1], [first_data_pt.C1]), axis=0).T,
+                    np.concatenate(([first_data_pt.L1],
+                                    [first_data_pt.C1]),
+                                   axis=0).T,
                     ecef, 1)
 
     # sats_man = mgmt.get_sats_management()
@@ -33,11 +35,11 @@ def initialize_c_code(ecef, alm, data):
     # stupid_state= mgmt.get_stupid_state(len(sats)-1)
 
 
-def analyze(b, data_filename, almanac_filename, analysis_filename):
-    data = io.load_data(data_filename)  #TODO implement
-    alm = io.load_almanac(almanac_filename)  #TODO implement
+def analyze(b, ecef, data_filename, almanac_filename, analysis_filename):
+    data = io.load_data(data_filename)
+    alm = io.load_almanac(almanac_filename)
 
-    ecef = utils.get_ecef(data)  #TODO implement or make it an IO thing
+    # ecef = utils.get_ecef(data)  # TODO decide how we want to get this one
 
     point_analyses = {}
     aggregate_analysis = sd_analysis.Aggregator(ecef, b, data)
@@ -47,4 +49,4 @@ def analyze(b, data_filename, almanac_filename, analysis_filename):
     for i, time in data.items:
         point_analyses[time] = sd_analysis.analyze_datum(data.ix[time], i, time, aggregate_analysis)  #NOTE: this changes aggregate_analysis
 
-    io.save_analysis(point_analyses, aggregate_analysis, analysis_filename) #TODO implement
+    io.save_analysis(point_analyses, aggregate_analysis, analysis_filename)  # TODO implement
