@@ -38,6 +38,7 @@ def load_data(data_filename, key):
 def load_almanac(almanac_filename):
     return load_yuma(open(almanac_filename))
 
+
 def save_analysis(point_analyses, aggregate_analysis, analysis_filename): #TODO use hdf5 instead of pickle, for speed and long-term usability (pickle only knows the name of a class)
     store = pd.HDFSTORE(analysis_filename)
     store['point_analyses'] = point_analyses

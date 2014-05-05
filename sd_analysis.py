@@ -33,6 +33,7 @@ class Aggregator():
         #TODO the aggregator only considers a single set of satellites, doesn't care that it's dynamic.
         # That means it's ignorant of the fact that the (real and tested) hypotheses sets may change
 
+
 def analyze_datum(datum, i, time, ag):
     f2 = datum[~ (np.isnan(datum.L1) | np.isnan(datum.C1))]
     t_ = utils.datetime2gpst(time)  # TODO use a libswiftnav-python version

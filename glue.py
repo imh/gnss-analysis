@@ -54,6 +54,7 @@ def analyze(b, ecef, data_filename, data_key, almanac_filename, analysis_filenam
 
     analysis_io.save_analysis(point_analyses, aggregate_analysis, analysis_filename)
 
+
 if __name__ == "__main__":
     # b = np.array([-1.4861289,   0.84761746, -0.01029364])
     # b = np.array([ 0.22566864, -1.22651958, -1.1712659 ])
