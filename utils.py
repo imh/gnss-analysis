@@ -23,7 +23,7 @@ def datetime2gpst(timestamp):
     return gpstime.GpsTime(wn % 1024, tow)
 
 
-def get_N_from_b(measurements, de, b, b_cov=None, phi_var=None):
+def get_N_from_b(phase, de, b, b_cov=None, phi_var=None):
     num_dds = de.shape[0]
     if b_cov is None:
         b_cov = sphere_b_covariance()
@@ -31,8 +31,8 @@ def get_N_from_b(measurements, de, b, b_cov=None, phi_var=None):
         phi_var = 9e-4
     phi_cov = dd_phi_cov(num_dds, phi_var)
 
-    n_mean = measurements[:num_dds] - de.dot(b)
-    n_cov = phi_cov + de.dot(b_cov).dot(de.T)
+    n_mean = phase - de.dot(b)/0.19029
+    n_cov = phi_cov + de.dot(b_cov).dot(de.T)/0.19029/0.19029
     n = lam.ilsq(n_mean, n_cov, 1)[0]  # TODO verify shape
     return n
 

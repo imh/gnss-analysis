@@ -1,5 +1,6 @@
 import pandas
 import swiftnav.almanac as sa
+import pandas as pd
 
 __author__ = 'imh'
 
@@ -30,11 +31,15 @@ def load_yuma(yuma):
     return almanacs
 
 
-def load_data(data_filename):
-    return pandas.read_hdf(data_filename)
+def load_data(data_filename, key):
+    return pandas.read_hdf(data_filename, key)
 
 
 def load_almanac(almanac_filename):
     return load_yuma(open(almanac_filename))
 
-# def save_analysis(point_analyses, aggregate_analysis, analysis_filename):
+def save_analysis(point_analyses, aggregate_analysis, analysis_filename): #TODO use hdf5 instead of pickle, for speed and long-term usability (pickle only knows the name of a class)
+    store = pd.HDFSTORE(analysis_filename)
+    store['point_analyses'] = point_analyses
+    store['aggregate_analysis'] = aggregate_analysis
+    store.close()
