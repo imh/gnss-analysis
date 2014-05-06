@@ -41,6 +41,25 @@ def normalize(x):
     return x/np.sqrt(x.dot(x))
 
 
+l2pi = np.log(2*np.pi)
+
+
+def neg_log_likelihood(x, sigma):
+    #pdf(x) = (2*pi)**(-k/2) * abs(det(sigma))**(-0.5) * exp(-0.5 * x' * sigma**(-1) * x)
+    #- ln(pdf(x)) = -[- k * 0.5 * ln(2*pi) - 0.5 * ln(abs(det(sigma))) - 0.5 * x' * sigma**(-1) * x ]
+    #             = 0.5 * [ k * ln(2*pi) + ln(abs(det(sigma))) + x' * sigma**(-1) * x ]
+    #- ln(pdf(x)) = -(-k/2) * ln(2*pi) + (-0.5)      *    ln(abs(det(sigma))) + (-0.5) * x' * sigma**(-1) * x
+    #             =    k/2   *   ln(2*pi) + 0.5  *        ln(abs(det(sigma))) +   0.5  * x' * sigma**(-1) * x
+    #             =    k * 0.5 * ln(2*pi) + 0.5  * 0.5  * ln(abs(det(sigma)))          * x' * sigma**(-1) * x
+    #             =    k * gamma                        * ln(abs(det(sigma)))          * x' * sigma**(-1) * x
+    #       where gamma = 0.5 *  ln(2*pi) * 0.5 * 0.5
+    #                   = ln(2*pi) / 8
+    log_abs_det_sig = np.log(abs(np.linalg.det(sigma)))
+    k = len(x)
+    inv_sig_dot_x = np.linalg.solve(sigma, x)
+    return 0.5 * (k * l2pi + log_abs_det_sig + x.dot(inv_sig_dot_x))
+
+
 def get_de(ref_ecef, alm, sats_w_ref_first, time):
     de = np.zeros((len(sats_w_ref_first)-1, 3))
     e0 = normalize(alm[sats_w_ref_first[0]].calc_state(time)[0] - ref_ecef)

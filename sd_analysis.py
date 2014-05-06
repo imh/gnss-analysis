@@ -27,6 +27,8 @@ class Aggregator():
         self.resolution_i = None
         self.resolution_matches_ilsq_N = None
 
+        self.kf_weighted_log_likelihood = 0
+
         # first_data_pt = data.ix[0]
         # self.sats = list(first_data_pt[~ (np.isnan(first_data_pt.L1) |
         #                                     np.isnan(first_data_pt.C1))].index)
@@ -93,7 +95,11 @@ def analyze_datum(datum, i, time, ag):
     cov_labels_cols = map(lambda x: 'float_amb_cov_' + str(x), float_prns)
     cov_labels = map(lambda col: map(lambda row: col + '_' + str(row), float_prns), cov_labels_cols)
 
-
+    if not ag.resolution_ended:
+        ag.kf_weighted_log_likelihood = \
+            i / (i + 1.0) * ag.kf_weighted_log_likelihood \
+          + utils.neg_log_likelihood(float_ambs - float_N_i_from_b,
+                                     float_amb_cov) / (i + 1.0)
 
     output_data = np.concatenate((float_b_NED,
                                   faux_resolved_b_NED,
