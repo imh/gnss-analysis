@@ -6,6 +6,7 @@ import dgnss_settings
 import analysis_io
 import utils
 import sd_analysis
+from scipy.optimize import minimize
 
 __author__ = 'imh'
 
@@ -18,56 +19,153 @@ __author__ = 'imh'
 #     attempt to use real baseline to get true ambiguity, note it
 #     check convergence
 #     if converged, note time, and whether converged correctly
+class Analyzer():
+    def __init__(self, b, ecef,
+                       data_filename, data_key,
+                       almanac_filename, analysis_filename_prefix):
+        self.data = analysis_io.load_data(data_filename, data_key)
+        self.alm = analysis_io.load_almanac(almanac_filename)
+        self.settings = None
+        self.b = b
+        self.ecef = ecef
+
+        self.nll_penalty = 1
+        self.res_not_ended_penalty = 1e3
+        self.res_not_started_penalty = 1e3
+        self.ilsq_not_in_pool_penalty = 1e6
+        self.not_res_to_ilsq_penalty = 1e6
+        self.time_to_resolution_start_penalty = 0.5
+        self.time_to_resolution_end_penalty = 1
+
+        self.analysis_filename_prefix = analysis_filename_prefix
+        self.iteration = 0
+
+    def analyze_to_file(self, settings, analysis_filename):
+        point_analyses, aggregate_analysis = self.run_analysis(settings)
+        analysis_io.save_analysis(point_analyses, aggregate_analysis,
+                                  settings, analysis_filename)
+
+    def tune(self):
+        x0 = self.initialize_x()
+        res = minimize(self.objective_function, x0, method='nelder-mead',
+                       options={'xtol': 1e-5, 'disp': True})
+        return res.x
+
+    def initialize_x(self):
+        return np.array([9e-4 * 16, 100 * 400,
+                         9e-4 * 16, 100 * 400,
+                         1e-8,
+                         1e8, 1e10])
+        # return np.array([9e-4 * 16, 100 * 400,
+        #                  9e-4 * 16, 100 * 400,
+        #                  1e-1, 1e-5, 1e-8,
+        #                  1e-8,
+        #                  1e2, 4e2, 1e8,
+        #                  1e10])
+
+    def objective_function(self, x):
+        settings = dgnss_settings.DgnssSettings(x[0], x[1],
+                                                x[2], x[3],
+                                                1e-1, 1e-5, 1e-8,
+                                                x[4],
+                                                1e2, 4e2, x[5],
+                                                x[6])
+        print settings
+        point_analyses, aggregate_analysis = self.run_analysis(settings)
+        analysis_filename = self.analysis_filename_prefix + '_' + str(self.iteration) \
+                            + '.hd5'
+        self.iteration += 1
+        analysis_io.save_analysis(point_analyses, aggregate_analysis,
+                                  settings, analysis_filename)
+
+        val = aggregate_analysis.kf_weighted_log_likelihood * self.nll_penalty
+        print 'weighted nll = ' + str(aggregate_analysis.kf_weighted_log_likelihood)
+        if aggregate_analysis.resolution_started:
+            val += self.time_to_resolution_start_penalty \
+                   * aggregate_analysis.float_convergence_time_delta.seconds
+            print 'res started at ' + str(aggregate_analysis.float_convergence_time_delta)
+            if not aggregate_analysis.resolution_contains_ilsq_N:
+                val += self.ilsq_not_in_pool_penalty
+                print 'no pool ilsq containment'
+        else:
+            val += self.res_not_started_penalty
+            print 'res not started'
+        if aggregate_analysis.resolution_ended:
+            val += self.time_to_resolution_end_penalty \
+                   * aggregate_analysis.resolution_time_delta.seconds
+            print 'res ended at ' + str(aggregate_analysis.resolution_time_delta)
+            if not aggregate_analysis.resolution_matches_ilsq_N:
+                val += self.not_res_to_ilsq_penalty
+                print 'no resolution ilsq match'
+        else:
+            val += self.res_not_ended_penalty
+            print 'res not ended'
+
+        print 'objective fun = ' + str(val) + '\n'
+        return val
+
+    def run_analysis(self, settings):
+        # ecef = utils.get_ecef(data)  # TODO decide how we want to get this one
+
+        point_analyses = {}
+        aggregate_analysis = sd_analysis.Aggregator(self.ecef, self.b,
+                                                    self.data, self.alm)
+        self.set_dgnss_settings(settings)
+        self.initialize_c_code()
+
+        for i, time in enumerate(self.data.items[1:]):
+            point_analyses[time] = sd_analysis.analyze_datum(self.data.ix[time], i, time, aggregate_analysis)  #NOTE: this changes aggregate_analysis
+        point_analyses = pd.DataFrame(point_analyses).T
+        return point_analyses, aggregate_analysis
+
+    def initialize_c_code(self):
+        first_data_pt = self.data.ix[0][~ (np.isnan(self.data.ix[0].L1) | np.isnan(self.data.ix[0].C1))]
+        sats = list(first_data_pt.index)
+        numeric_sats = map(lambda x: int(x[1:]), sats)
+        t0 = utils.datetime2gpst(self.data.items[0])
+
+        mgmt.dgnss_init([self.alm[j] for j in numeric_sats], t0,
+                        np.concatenate(([first_data_pt.L1],
+                                        [first_data_pt.C1]),
+                                       axis=0).T,
+                        self.ecef, 1)
+
+    def set_dgnss_settings(self, dgnss_settings):
+        mgmt.set_settings(dgnss_settings.phase_var_test, dgnss_settings.code_var_test,
+                          dgnss_settings.phase_var_kf, dgnss_settings.code_var_kf,
+                          dgnss_settings.pos_trans_var, dgnss_settings.vel_trans_var, dgnss_settings.int_trans_var,
+                          dgnss_settings.amb_drift_var,
+                          dgnss_settings.pos_init_var, dgnss_settings.vel_init_var, dgnss_settings.amb_init_var,
+                          dgnss_settings.new_int_var)
 
 
-def initialize_c_code(ecef, alm, data):
+# def analyze(b, ecef, settings,
+#             data_filename, data_key,
+#             almanac_filename, analysis_filename):
+#     point_analyses, aggregate_analysis =  run_analysis(b, ecef, settings,
+#                                                        data_filename, data_key,
+#                                                        almanac_filename)
+#     analysis_io.save_analysis(point_analyses, aggregate_analysis, settings, analysis_filename)
 
-    first_data_pt = data.ix[0][~ (np.isnan(data.ix[0].L1) | np.isnan(data.ix[0].C1))]
-    sats = list(first_data_pt.index)
-    numeric_sats = map(lambda x: int(x[1:]), sats)
-    t0 = utils.datetime2gpst(data.items[0])
-
-    mgmt.dgnss_init([alm[j] for j in numeric_sats], t0,
-                    np.concatenate(([first_data_pt.L1],
-                                    [first_data_pt.C1]),
-                                   axis=0).T,
-                    ecef, 1)
-
-    # sats_man = mgmt.get_sats_management()
-    # kf = mgmt.get_dgnss_kf()
-    # stupid_state= mgmt.get_stupid_state(len(sats)-1)
-
-
-def set_dgnss_settings(dgnss_settings):
-    mgmt.set_settings(dgnss_settings.phase_var_test, dgnss_settings.code_var_test,
-                      dgnss_settings.phase_var_kf, dgnss_settings.code_var_kf,
-                      dgnss_settings.pos_trans_var, dgnss_settings.vel_trans_var, dgnss_settings.int_trans_var,
-                      dgnss_settings.amb_drift_var,
-                      dgnss_settings.pos_init_var, dgnss_settings.vel_init_var, dgnss_settings.amb_init_var,
-                      dgnss_settings.new_int_var)
-
-
-def analyze(b, ecef, settings,
-            data_filename, data_key,
-            almanac_filename, analysis_filename):
-    data = analysis_io.load_data(data_filename, data_key)
-    alm = analysis_io.load_almanac(almanac_filename)
-
-    # ecef = utils.get_ecef(data)  # TODO decide how we want to get this one
-
-    point_analyses = {}
-    aggregate_analysis = sd_analysis.Aggregator(ecef, b, data, alm)
-
-    set_dgnss_settings(settings)
-
-    initialize_c_code(ecef, alm, data)
-
-    for i, time in enumerate(data.items[1:]):
-        point_analyses[time] = sd_analysis.analyze_datum(data.ix[time], i, time, aggregate_analysis)  #NOTE: this changes aggregate_analysis
-    point_analyses = pd.DataFrame(point_analyses).T
-
-    analysis_io.save_analysis(point_analyses, aggregate_analysis, settings, analysis_filename)
-
+# def run_analysis(b, ecef, settings,
+#                  data_filename, data_key,
+#                  almanac_filename):
+#     data = analysis_io.load_data(data_filename, data_key)
+#     alm = analysis_io.load_almanac(almanac_filename)
+#
+#     # ecef = utils.get_ecef(data)  # TODO decide how we want to get this one
+#
+#     point_analyses = {}
+#     aggregate_analysis = sd_analysis.Aggregator(ecef, b, data, alm)
+#
+#     set_dgnss_settings(settings)
+#
+#     initialize_c_code(ecef, alm, data)
+#
+#     for i, time in enumerate(data.items[1:]):
+#         point_analyses[time] = sd_analysis.analyze_datum(data.ix[time], i, time, aggregate_analysis)  #NOTE: this changes aggregate_analysis
+#     point_analyses = pd.DataFrame(point_analyses).T
+#     return point_analyses, aggregate_analysis
 
 if __name__ == "__main__":
 
@@ -80,13 +178,25 @@ if __name__ == "__main__":
     data_key = 'sd'
     almanac_filename = "/home/imh/software/swift/projects/integer-ambiguity/001.ALM"
     analysis_filename = "/home/imh/software/swift/analyses/fake.hd5"
+    analysis_filename_prefix = "/home/imh/software/swift/analyses/fake"
 
-    settings = dgnss_settings.DgnssSettings(phase_var_test=9e-4 * 16, code_var_test=100 * 400,
-                                            phase_var_kf=9e-4 * 16, code_var_kf=100 * 400,
-                                            pos_trans_var=1e-1, vel_trans_var=1e-5, int_trans_var=1e-8,
-                                            pos_init_var=1e2, vel_init_var=4e2, amb_init_var=1e8,
-                                            new_int_var=1e10)
+    analyzer = Analyzer(b, ecef, data_filename, data_key, almanac_filename, analysis_filename_prefix)
+    x = analyzer.tune()
+    settings = dgnss_settings.DgnssSettings(x[0], x[1],
+                                            x[2], x[3],
+                                            1e-1, 1e-5, 1e-8,
+                                            x[4],
+                                            1e2, 4e2, x[5],
+                                            x[6])
+    print 'best found:'
+    print settings
 
-    analyze(b, ecef, settings,
-            data_filename, data_key,
-            almanac_filename, analysis_filename)
+    # settings = dgnss_settings.DgnssSettings(phase_var_test=9e-4 * 16, code_var_test=100 * 400,
+    #                                         phase_var_kf=9e-4 * 16, code_var_kf=100 * 400,
+    #                                         pos_trans_var=1e-1, vel_trans_var=1e-5, int_trans_var=1e-8,
+    #                                         pos_init_var=1e2, vel_init_var=4e2, amb_init_var=1e8,
+    #                                         new_int_var=1e10)
+    #
+    # analyze(b, ecef, settings,
+    #         data_filename, data_key,
+    #         almanac_filename, analysis_filename)

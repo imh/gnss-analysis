@@ -121,7 +121,10 @@ def sweep_analyze(b, ecef,
                                         new_int_var)
 
     id = 0
-    for settings in settings_sweep.sweep():
+    all_settings = settings_sweep.sweep()
+    num_settings = len(all_settings)
+    for i, settings in enumerate(all_settings):
+        print 'iteration ' + str(i+1) + ' / ' + str(num_settings)
         full_analysis_filename = analysis_filename + "_" + str(id)
         print settings
         glue.analyze(b, ecef, settings,
