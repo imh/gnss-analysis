@@ -70,7 +70,7 @@ class Analyzer():
                                                 x[4],
                                                 1e2, 4e2, x[5],
                                                 x[6])
-        print settings
+        # print settings
         point_analyses, aggregate_analysis = self.run_analysis(settings)
         analysis_filename = self.analysis_filename_prefix + '_' + str(self.iteration) \
                             + '.hd5'
@@ -79,6 +79,20 @@ class Analyzer():
                                   settings, analysis_filename)
 
         val = aggregate_analysis.kf_weighted_log_likelihood * self.nll_penalty
+        if x[0] <= 0:
+            val += 1e25
+        if x[1] <= 0:
+            val += 1e25
+        if x[2] <= 0:
+            val += 1e25
+        if x[3] <= 0:
+            val += 1e25
+        if x[4] <= 0:
+            val += 1e25
+        if x[5] <= 0:
+            val += 1e25
+        if x[6] <= 0:
+            val += 1e25
         print 'weighted nll = ' + str(aggregate_analysis.kf_weighted_log_likelihood)
         if aggregate_analysis.resolution_started:
             val += self.time_to_resolution_start_penalty \
@@ -114,6 +128,7 @@ class Analyzer():
         self.initialize_c_code()
 
         for i, time in enumerate(self.data.items[1:]):
+            print i
             point_analyses[time] = sd_analysis.analyze_datum(self.data.ix[time], i, time, aggregate_analysis)  #NOTE: this changes aggregate_analysis
         point_analyses = pd.DataFrame(point_analyses).T
         return point_analyses, aggregate_analysis

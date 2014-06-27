@@ -56,8 +56,16 @@ def neg_log_likelihood(x, sigma):
     #                   = ln(2*pi) / 8
     log_abs_det_sig = np.log(abs(np.linalg.det(sigma)))
     k = len(x)
-    inv_sig_dot_x = np.linalg.solve(sigma, x)
-    return 0.5 * (k * l2pi + log_abs_det_sig + x.dot(inv_sig_dot_x))
+    pen = 0
+    try:
+        inv_sig_dot_x = np.linalg.solve(sigma, x)
+    except np.linalg.linalg.LinAlgError:
+        pinv_sig = np.linalg.pinv(sigma)
+        inv_sig_dot_x = pinv_sig.dot(x)
+        pen = 1e40
+        log_abs_det_sig = 0
+
+    return 0.5 * (k * l2pi + log_abs_det_sig + x.dot(inv_sig_dot_x)) + pen
 
 
 def get_de(ref_ecef, alm, sats_w_ref_first, time):

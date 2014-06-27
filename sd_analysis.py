@@ -59,8 +59,6 @@ def analyze_datum(datum, i, time, ag):
     numeric_sats = map(lambda x: int(x[1:]), list(sats))
     alms = [ag.alm[j] for j in numeric_sats]
     ref_ecef = ag.ecef.copy()
-    if i == 728:
-        ref_ecef += np.array([0,0, 1e-1])
     mgmt.dgnss_update(alms, t_,
                       measurements,
                       ref_ecef, 1)
@@ -69,6 +67,9 @@ def analyze_datum(datum, i, time, ag):
     #                   ag.ecef + np.array([0, 0, 1e-1]), 1)
 
     # get ILSQ ambiguity from 'known' baseline
+    if len(sats) <= 1:
+        return pd.Series([], index=[])
+
     float_de, float_phase = mgmt.get_float_de_and_phase(alms, t_, measurements, ag.ecef + 0.5 * ag.b)
     float_N_i_from_b = utils.get_N_from_b(float_phase, float_de, ag.b)
     #TODO save it in the Series or DataFrame output, along with its sats, so that we may analyze its variation and use dynamic sat sets
@@ -129,6 +130,9 @@ def analyze_datum(datum, i, time, ag):
         iar_MLE_b_NED = cs.wgsecef2ned(iar_MLE_b, ag.ecef)
 
         output_data = np.concatenate((output_data,
+
+
+
                                       iar_MLE_b_NED,
                                       iar_faux_resolved_b_NED,
                                       iar_MLE_ambs,
@@ -155,8 +159,9 @@ def analyze_datum(datum, i, time, ag):
             ag.N = n
             ag.resolution_matches_ilsq_N = True
             for j in xrange(len(ag.N)):
-                if int(ag.N[j]) != int(iar_N_i_from_b[j]):
+                if int(round(ag.N[j])) != int(round(iar_N_i_from_b[j])):
                     ag.resolution_matches_ilsq_N = False
                     break
+            pass
 
     return pd.Series(output_data, index=output_labels)

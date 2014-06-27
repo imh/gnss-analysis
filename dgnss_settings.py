@@ -13,18 +13,18 @@ class DgnssSettings():
                  amb_drift_var=None,
                  pos_init_var=None, vel_init_var=None, amb_init_var=None,
                  new_int_var=None):
-        self.phase_var_test = phase_var_test
-        self.code_var_test  = code_var_test
-        self.phase_var_kf   = phase_var_kf
-        self.code_var_kf    = code_var_kf
-        self.pos_trans_var  = pos_trans_var
-        self.vel_trans_var  = vel_trans_var
-        self.int_trans_var  = int_trans_var
-        self.amb_drift_var  = amb_drift_var
-        self.pos_init_var   = pos_init_var
-        self.vel_init_var   = vel_init_var
-        self.amb_init_var   = amb_init_var
-        self.new_int_var    = new_int_var
+        self.phase_var_test = max(0, phase_var_test)
+        self.code_var_test  = max(0, code_var_test)
+        self.phase_var_kf   = max(0, phase_var_kf)
+        self.code_var_kf    = max(0, code_var_kf)
+        self.pos_trans_var  = max(0, pos_trans_var)
+        self.vel_trans_var  = max(0, vel_trans_var)
+        self.int_trans_var  = max(0, int_trans_var)
+        self.amb_drift_var  = max(0, amb_drift_var)
+        self.pos_init_var   = max(0, pos_init_var)
+        self.vel_init_var   = max(0, vel_init_var)
+        self.amb_init_var   = max(0, amb_init_var)
+        self.new_int_var    = max(0, new_int_var)
 
     def store(self, store_attrs):
         for k, v in self.__dict__.iteritems():
