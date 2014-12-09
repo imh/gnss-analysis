@@ -1,6 +1,9 @@
-import pandas
+
 import swiftnav.almanac as sa
 import pandas as pd
+import numpy as np
+from swiftnav.single_diff import SingleDiff
+import utils
 
 __author__ = 'imh'
 
@@ -32,8 +35,32 @@ def load_yuma(yuma):
 
 
 def load_data(data_filename, key):
-    return pandas.read_hdf(data_filename, key)
+    return pd.read_hdf(data_filename, key)
 
+def load_ephs(eph_filename):
+    return pd.read_hdf(eph_filename, 'eph')
+
+
+def mk_swiftnav_sdiff(x):
+    if np.isnan(x.C1):
+        return np.nan
+    return SingleDiff(x.C1,
+                      x.L1,
+                      x.D1,
+                      np.array([x.sat_pos_x, x.sat_pos_y, x.sat_pos_z]), 
+                      np.array([x.sat_vel_x, x.sat_vel_y, x.sat_vel_z]),
+                      x.min_snr,
+                      x.prn)
+
+
+def load_sdiffs(filename, key):
+    """
+    Given a filename and key for an hdf5 file for a pandas panel
+    whose entries are the fields for sdiffs, this function will
+    read the file and convert it into a pandas dataframe of our
+    libswiftnav sdiffs.
+    """
+    return pd.read_hdf(filename, key).apply(mk_swiftnav_sdiff, axis=2)
 
 def load_almanac(almanac_filename):
     return load_yuma(open(almanac_filename))
