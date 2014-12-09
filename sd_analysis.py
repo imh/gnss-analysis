@@ -2,19 +2,20 @@ import numpy as np
 import pandas as pd
 import swiftnav.dgnss_management as mgmt
 import utils
+import swiftnav.gpstime as gpstime
 import swiftnav.coord_system as cs
 import operator
 
 __author__ = 'imh'
 
 class Aggregator():
-    def __init__(self, ecef, b, data, alm):
+    def __init__(self, ecef, b, data):
         self.ecef = ecef
         self.b = np.array(b)
         self.b_NED = cs.wgsecef2ned(b, ecef)
-        self.alm = alm
+        # self.alm = alm
 
-        self.t_0 = data.items[0]
+        self.t_0 = data.index[0]
 
         self.resolution_started = False
         self.resolution_contains_ilsq_N = None
@@ -52,16 +53,15 @@ class Aggregator():
                 print "Unable to store '%s'" % k
 
 def analyze_datum(datum, i, time, ag):
-    f2 = datum[~ (np.isnan(datum.L1) | np.isnan(datum.C1))]
-    t_ = utils.datetime2gpst(time)  # TODO use a libswiftnav-python version
+    f2 = datum[datum.apply(utils.not_nan)]
+    t_ = gpstime.datetime2gpst(time)  # TODO use a libswiftnav-python version
     sats = list(f2.index)
-    measurements = np.concatenate(([f2.ix[sats,'L1']], [f2.ix[sats,'C1']]), axis=0).T
+    # measurements = np.concatenate(([f2.ix[sats,'L1']], [f2.ix[sats,'C1']]), axis=0).T
     numeric_sats = map(lambda x: int(x[1:]), list(sats))
-    alms = [ag.alm[j] for j in numeric_sats]
+    # alms = [ag.alm[j] for j in numeric_sats]
     ref_ecef = ag.ecef.copy()
-    mgmt.dgnss_update(alms, t_,
-                      measurements,
-                      ref_ecef, 1)
+    mgmt.dgnss_update(f2,
+                      ref_ecef)
     # mgmt.dgnss_update(alms, t_,
     #                   measurements,
     #                   ag.ecef + np.array([0, 0, 1e-1]), 1)
@@ -70,13 +70,13 @@ def analyze_datum(datum, i, time, ag):
     if len(sats) <= 1:
         return pd.Series([], index=[])
 
-    float_de, float_phase = mgmt.get_float_de_and_phase(alms, t_, measurements, ag.ecef + 0.5 * ag.b)
+    float_de, float_phase = mgmt.get_float_de_and_phase(f2, ag.ecef + 0.5 * ag.b)
     float_N_i_from_b = utils.get_N_from_b(float_phase, float_de, ag.b)
     #TODO save it in the Series or DataFrame output, along with its sats, so that we may analyze its variation and use dynamic sat sets
 
     #TODO the two baseline computations loop to find DE, which could be fused
-    float_b = mgmt.measure_float_b(alms, t_, measurements, ag.ecef)
-    faux_resolved_b = mgmt.measure_b_with_external_ambs(alms, t_, measurements, float_N_i_from_b, ag.ecef)
+    float_b = mgmt.measure_float_b(f2, ag.ecef)
+    faux_resolved_b = mgmt.measure_b_with_external_ambs(f2, float_N_i_from_b, ag.ecef)
     float_b_NED = cs.wgsecef2ned(float_b, ag.ecef)  # NOTE: maybe use ag.ecef + 0.5*b or something
     faux_resolved_b_NED = cs.wgsecef2ned(faux_resolved_b, ag.ecef)
 
@@ -118,15 +118,15 @@ def analyze_datum(datum, i, time, ag):
                   + ['float_ref_sat']
 
     if float_converged and (num_hyps > 0):
-        iar_de, iar_phase = mgmt.get_iar_de_and_phase(alms, t_, measurements, ag.ecef + 0.5 * ag.b)
+        iar_de, iar_phase = mgmt.get_iar_de_and_phase(f2, ag.ecef + 0.5 * ag.b)
         iar_N_i_from_b = utils.get_N_from_b(iar_phase, iar_de, ag.b)
         iar_prns = mgmt.get_amb_test_prns()
         iar_ref_prn = iar_prns[0]
         iar_prns = iar_prns[1:]
-        iar_faux_resolved_b = mgmt.measure_iar_b_with_external_ambs(alms, t_, measurements, iar_N_i_from_b, ag.ecef)
+        iar_faux_resolved_b = mgmt.measure_iar_b_with_external_ambs(f2, iar_N_i_from_b, ag.ecef)
         iar_faux_resolved_b_NED = cs.wgsecef2ned(iar_faux_resolved_b, ag.ecef)
         iar_MLE_ambs = mgmt.dgnss_iar_MLE_ambs()
-        iar_MLE_b = mgmt.measure_iar_b_with_external_ambs(alms, t_, measurements, iar_MLE_ambs, ag.ecef)
+        iar_MLE_b = mgmt.measure_iar_b_with_external_ambs(f2, iar_MLE_ambs, ag.ecef)
         iar_MLE_b_NED = cs.wgsecef2ned(iar_MLE_b, ag.ecef)
 
         output_data = np.concatenate((output_data,

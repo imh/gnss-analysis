@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import swiftnav.dgnss_management as mgmt
 import swiftnav.coord_system as cs
+import swiftnav.gpstime as gpstime
 import dgnss_settings
 import analysis_io
 import utils
@@ -21,10 +22,11 @@ __author__ = 'imh'
 #     if converged, note time, and whether converged correctly
 class Analyzer():
     def __init__(self, b, ecef,
-                       data_filename, data_key,
-                       almanac_filename, analysis_filename_prefix):
-        self.data = analysis_io.load_data(data_filename, data_key)
-        self.alm = analysis_io.load_almanac(almanac_filename)
+                 data_filename, data_key,
+                 analysis_filename_prefix):
+        # self.data = analysis_io.load_data(data_filename, data_key)
+        # self.alm = analysis_io.load_almanac(almanac_filename)
+        self.data = analysis_io.load_sdiffs(data_filename, data_key)
         self.settings = None
         self.b = b
         self.ecef = ecef
@@ -124,7 +126,8 @@ class Analyzer():
         point_analyses = {}
         aggregate_analysis = sd_analysis.Aggregator(self.ecef, self.b,
                                                     self.data, self.alm)
-        self.set_dgnss_settings(settings)
+        if settings is not None:
+            self.set_dgnss_settings(settings)
         self.initialize_c_code()
 
         for i, time in enumerate(self.data.items[1:]):
@@ -134,16 +137,13 @@ class Analyzer():
         return point_analyses, aggregate_analysis
 
     def initialize_c_code(self):
-        first_data_pt = self.data.ix[0][~ (np.isnan(self.data.ix[0].L1) | np.isnan(self.data.ix[0].C1))]
+        first_data_pt = self.data.ix[0][self.data.ix[0].apply(utils.not_nan)]
         sats = list(first_data_pt.index)
         numeric_sats = map(lambda x: int(x[1:]), sats)
-        t0 = utils.datetime2gpst(self.data.items[0])
+        t0 = gpstime.datetime2gpst(self.data.index[0])
 
-        mgmt.dgnss_init([self.alm[j] for j in numeric_sats], t0,
-                        np.concatenate(([first_data_pt.L1],
-                                        [first_data_pt.C1]),
-                                       axis=0).T,
-                        self.ecef, 1)
+        mgmt.dgnss_init(first_data_pt,
+                        self.ecef)
 
     def set_dgnss_settings(self, dgnss_settings):
         mgmt.set_settings(dgnss_settings.phase_var_test, dgnss_settings.code_var_test,
@@ -182,18 +182,15 @@ class Analyzer():
 #     point_analyses = pd.DataFrame(point_analyses).T
 #     return point_analyses, aggregate_analysis
 
-if __name__ == "__main__":
-
-    # b = np.array([-1.4861289,   0.84761746, -0.01029364])
-    # b = np.array([ 0.22566864, -1.22651958, -1.1712659 ])
+def main_tune():
     b = np.array([15, 0, 0])
-    llh = np.array([np.deg2rad(37.7798), np.deg2rad(-122.3923), 40])
+    #rough lemnos position:
+    llh = np.array([np.deg2rad(37.755927), np.deg2rad(-122.390699), 6])
     ecef = cs.wgsllh2ecef(*llh)
-    data_filename = "/home/imh/software/swift/projects/integer-ambiguity/fake.hd5"
-    data_key = 'sd'
-    almanac_filename = "/home/imh/software/swift/projects/integer-ambiguity/001.ALM"
-    analysis_filename = "/home/imh/software/swift/analyses/fake.hd5"
-    analysis_filename_prefix = "/home/imh/software/swift/analyses/fake"
+    data_filename = "/users/imh/software/swift/libs/gnss-analysis/test-data/Rover-20141125-232940-49.hd5"
+    data_key = 'sdiff_rover_base'
+    analysis_filename = "/users/imh/software/swift/libs/gnss-analysis/test-data/analysis.hd5"
+    analysis_filename_prefix = "/users/imh/software/swift/libs/gnss-analysis/test-data/analyses"
 
     analyzer = Analyzer(b, ecef, data_filename, data_key, almanac_filename, analysis_filename_prefix)
     x = analyzer.tune()
@@ -206,12 +203,52 @@ if __name__ == "__main__":
     print 'best found:'
     print settings
 
-    # settings = dgnss_settings.DgnssSettings(phase_var_test=9e-4 * 16, code_var_test=100 * 400,
-    #                                         phase_var_kf=9e-4 * 16, code_var_kf=100 * 400,
-    #                                         pos_trans_var=1e-1, vel_trans_var=1e-5, int_trans_var=1e-8,
-    #                                         pos_init_var=1e2, vel_init_var=4e2, amb_init_var=1e8,
-    #                                         new_int_var=1e10)
-    #
-    # analyze(b, ecef, settings,
-    #         data_filename, data_key,
-    #         almanac_filename, analysis_filename)
+def main_analyze():
+    b = np.array([15, 0, 0])
+    #rough lemnos position:
+    llh = np.array([np.deg2rad(37.755927), np.deg2rad(-122.390699), 6])
+    ecef = cs.wgsllh2ecef(*llh)
+    data_filename = "/users/imh/software/swift/libs/gnss-analysis/test-data/Rover-20141125-232940-49.hd5"
+    data_key = 'sdiff_rover_base'
+    analysis_filename = "/users/imh/software/swift/libs/gnss-analysis/test-data/analysis.hd5"
+    analysis_filename_prefix = "/users/imh/software/swift/libs/gnss-analysis/test-data/analyses"
+
+    analyzer = Analyzer(b, ecef, data_filename, data_key, almanac_filename, analysis_filename_prefix)
+    x = analyzer.run_analysis(None)
+    # x = analyzer.tune()
+
+if __name__ == "__main__":
+    main_analyze()
+
+    # # b = np.array([-1.4861289,   0.84761746, -0.01029364])
+    # # b = np.array([ 0.22566864, -1.22651958, -1.1712659 ])
+
+    # b = np.array([15, 0, 0])
+    # #rough lemnos position:
+    # llh = np.array([np.deg2rad(37.755927), np.deg2rad(-122.390699), 6])
+    # ecef = cs.wgsllh2ecef(*llh)
+    # data_filename = "/users/imh/software/swift/libs/gnss-analysis/test-data/Rover-20141125-232940-49.hd5"
+    # data_key = 'sdiff_rover_base'
+    # analysis_filename = "/users/imh/software/swift/libs/gnss-analysis/test-data/analysis.hd5"
+    # analysis_filename_prefix = "/users/imh/software/swift/libs/gnss-analysis/test-data/analyses"
+
+    # analyzer = Analyzer(b, ecef, data_filename, data_key, almanac_filename, analysis_filename_prefix)
+    # x = analyzer.tune()
+    # settings = dgnss_settings.DgnssSettings(x[0], x[1],
+    #                                         x[2], x[3],
+    #                                         1e-1, 1e-5, 1e-8,
+    #                                         x[4],
+    #                                         1e2, 4e2, x[5],
+    #                                         x[6])
+    # print 'best found:'
+    # print settings
+
+    # # settings = dgnss_settings.DgnssSettings(phase_var_test=9e-4 * 16, code_var_test=100 * 400,
+    # #                                         phase_var_kf=9e-4 * 16, code_var_kf=100 * 400,
+    # #                                         pos_trans_var=1e-1, vel_trans_var=1e-5, int_trans_var=1e-8,
+    # #                                         pos_init_var=1e2, vel_init_var=4e2, amb_init_var=1e8,
+    # #                                         new_int_var=1e10)
+    # #
+    # # analyze(b, ecef, settings,
+    # #         data_filename, data_key,
+    # #         almanac_filename, analysis_filename)
