@@ -125,25 +125,20 @@ class Analyzer():
 
         point_analyses = {}
         aggregate_analysis = sd_analysis.Aggregator(self.ecef, self.b,
-                                                    self.data, self.alm)
+                                                    self.data)
         if settings is not None:
             self.set_dgnss_settings(settings)
         self.initialize_c_code()
 
-        for i, time in enumerate(self.data.items[1:]):
-            print i
+        for i, time in enumerate(self.data.index[1:]):
             point_analyses[time] = sd_analysis.analyze_datum(self.data.ix[time], i, time, aggregate_analysis)  #NOTE: this changes aggregate_analysis
         point_analyses = pd.DataFrame(point_analyses).T
         return point_analyses, aggregate_analysis
 
     def initialize_c_code(self):
-        first_data_pt = self.data.ix[0][self.data.ix[0].apply(utils.not_nan)]
-        sats = list(first_data_pt.index)
-        numeric_sats = map(lambda x: int(x[1:]), sats)
-        t0 = gpstime.datetime2gpst(self.data.index[0])
+        first_data_pt = utils.get_non_nans(self.data.ix[0])
 
-        mgmt.dgnss_init(first_data_pt,
-                        self.ecef)
+        mgmt.dgnss_init(first_data_pt, self.ecef)
 
     def set_dgnss_settings(self, dgnss_settings):
         mgmt.set_settings(dgnss_settings.phase_var_test, dgnss_settings.code_var_test,
@@ -213,7 +208,7 @@ def main_analyze():
     analysis_filename = "/users/imh/software/swift/libs/gnss-analysis/test-data/analysis.hd5"
     analysis_filename_prefix = "/users/imh/software/swift/libs/gnss-analysis/test-data/analyses"
 
-    analyzer = Analyzer(b, ecef, data_filename, data_key, almanac_filename, analysis_filename_prefix)
+    analyzer = Analyzer(b, ecef, data_filename, data_key, analysis_filename_prefix)
     x = analyzer.run_analysis(None)
     # x = analyzer.tune()
 
