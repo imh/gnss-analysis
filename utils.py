@@ -68,7 +68,11 @@ def get_de(ref_ecef, alm, sats_w_ref_first, time):
         de[i] = normalize(alm[sat].calc_state(time)[0] - ref_ecef) - e0
     return de
 
+
 def not_nan(x):
     if str(x) == 'nan':
         return False
     return True
+
+def get_non_nans(xs):
+    return xs[xs.apply(not_nan)]
