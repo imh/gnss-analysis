@@ -53,7 +53,7 @@ class Aggregator():
                 print "Unable to store '%s'" % k
 
 def analyze_datum(datum, i, time, ag):
-    f2 = datum[datum.apply(utils.not_nan)]
+    f2 = utils.get_non_nans(datum)
     t_ = gpstime.datetime2gpst(time)  # TODO use a libswiftnav-python version
     sats = list(f2.index)
     # measurements = np.concatenate(([f2.ix[sats,'L1']], [f2.ix[sats,'C1']]), axis=0).T
