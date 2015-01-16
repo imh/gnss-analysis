@@ -1,17 +1,16 @@
 
-
+import pandas as pd
 
 class SITL:
-  def __init__(self, update_function):
-    self.analyses = set()
+  def __init__(self, update_function, data):
+    self.analyses = dict()
     self.non_summary_analyses = []
     self.summary_analyses = []
     self.reports = set()
     self.analysis_edges = set()
-    self.data = None
+    self.data = data
     self.all_maps = None
     self.update_function = update_function
-    raise Exception("have not yet implemented data")
 
 
   def add_report(self, report):
@@ -30,43 +29,73 @@ class SITL:
 
   def compute(self):
     self.sort_analyses()
-    prev_fold = None
-    for i, datum in enumerate(data):
+    prev_fold = fold_inits(self.non_summary_analyses)
+    maps = dict()
+
+    for i, datum in enumerate(self.data):
+      #initialize
       current_analyses = dict()
       current_fold = dict()
       current_map = dict()
+
+      #update
       self.update_function(datum)
+
+      # compute everything and put it away for other computations
       for analysis in self.non_summary_analyses:
-        comp = analysis.compute(current_analyses, prev_fold)
+        comp = analysis.compute(datum, current_analyses, prev_fold)
         key = analysis.key
         if analysis.keep_as_map:
           current_map[key] = comp
         if analysis.keep_as_fold:
           current_fold[key] = comp
         current_analyses[analysis.key] = comp
+
+      #store analyses for later
       prev_fold = current_fold
-      self.store_map(i, datum, current_map)
-    current_analyses = self.all_da_maps
+      maps[i] = current_map
+    analyses = pandafy(maps)
+    analyses = maps #TODO analyses need to return columns
     for analysis in self.summary_analyses:
-      current_analyses[analysis.key] = analysis.compute(current_analyses, prev_fold)
+      analyses[analysis.key] = analysis.compute(self.data, analyses, prev_fold)
     reports = dict()
     for report in self.reports:
-      report.report(current_analyses, prev_fold)
+      reports[report.key] = report.report(self.data, analyses, prev_fold)
+    return reports
 
   def sort_analyses(self):
     nodes = self.analyses.keys()
     edges = self.analysis_edges
     s = nodes_without_incoming_edges(nodes, edges)
-    topo_order = []
+    self.non_summary_analyses = []
+    self.summary_analyses = []
     while not is_empty(s):
       node_from = s.pop()
-      topo_order += [node_from]
-      nodes_to = [edge[1] in edges if edge[0] == node_from]
+      analysis = self.analyses[node_from]
+      if analysis.is_summary:
+        self.summary_analyses.append(analysis)
+      else:
+        self.non_summary_analyses.append(analysis)
+      nodes_to = [edge[1] for edge in edges if edge[0] == node_from]
       for node_to in nodes_to:
         edges.remove((node_from, node_to))
         if not has_incoming_edges(edges, node_to):
-          s.add(node_to)
-    return topo_order
+          s.append(node_to)
+
+def pandafy(maps):
+  df = pd.DataFrame(maps).T
+  d = dict()
+  for key in df.keys():
+    d[key] = df[key]
+  return d
+
+
+def fold_inits(non_summary_analyses):
+  folds = dict()
+  for analysis in non_summary_analyses:
+    if analysis.keep_as_fold:
+      folds[analysis.key] = analysis.fold_init
+  return folds
 
 def nodes_without_incoming_edges(nodes, edges):
   #NOTE can't just go through the edge list because some nodes have no edges
@@ -80,51 +109,4 @@ def has_incoming_edges(edges, node):
 
 def is_empty(has_len):
   return len(has_len) == 0
-
-
-import reporters
-
-class SwiftSITL():
-  def __init__():
-    self.reports = set([])
-    self.all_analyses  = set([])
-    self.map_analyses  = set([])
-    self.fold_analyses = set([])
-    self.ordered_online_analyses  = []
-    self.ordered_summary_analyses = []
-    raise Exception("still need to load data.")
-    self.data = None
-
-  def run():
-    self.find_analyses_topological_order()
-    analyze_data()
-
-    raise Exception("Not implemented.")
-
-  def analyze_data():
-    previous_analyses = None
-    for datum in self.data:
-      analyses = dict()
-      reports = dict()
-      for analysis in self.ordered_online_analyses:
-        analyses[analysis.label] = analysis.analyze(previous_analyses, analyses, datum)
-      Exception("Then what do I do with the reports?")
-      previous_analyses = analyses
-    analyses = dict()
-    reports = dict()
-    for analysis in self.ordered_summary_analyses:
-      analyses[analysis.label] = analyses.analyze(ALL_REPORTS_OR_ANALYSES)
-    for report in summary_reports:
-      reports[report.label] = report.report(analyses)
-
-  def add_report(report):
-    if not report in self.reports:
-      self.reports.add(report)
-      self.add_analysis(report)
-
-  def add_analysis(analysis):
-    if not analyis in self.analyses:
-      self.analyses.add(analysis)
-      for parent in analysis.parents:
-        self.add_analysis(parent)
 
