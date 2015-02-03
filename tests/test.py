@@ -1,90 +1,89 @@
 #test dat shit
 
-from tmp_abstract_analyses import *
-from report import *
-from analysis import *
-
-#A fold to compute the sum of squares
-def sum_square_c(datum, current_analyses, prev_fold):
-  return prev_fold['sum_of_squares'] + datum**2
-
-def sum_square_a(keep_as_map=False):
-  return Analysis('sum_of_squares',
-                  sum_square_c,
-                  keep_as_fold=True,
-                  keep_as_map=keep_as_map,
-                  fold_init=0)
+from gnss_analysis.abstract_analysis.manage_tests import *
+from gnss_analysis.abstract_analysis.analysis import *
+from gnss_analysis.abstract_analysis.report import *
 
 
-#A fold to compute the sum
-def sum_c(datum, current_analyses, prev_fold):
-  return prev_fold['sum'] + datum
+#A fold to compute the sum of squares of the data points
+class SumSquareA(Analysis):
+  def __init__(self, keep_as_map=False):
+    super(SumSquareA, self).__init__(
+      key='sum_of_squares', 
+      keep_as_fold=True,
+      keep_as_map=keep_as_map,
+      fold_init=0)
+  def compute(self, datum, current_analyses, prev_fold):
+    return prev_fold['sum_of_squares'] + datum**2  
 
-def sum_a(keep_as_map=False):
-  return Analysis('sum',
-                  sum_c,
-                  keep_as_fold=True,
-                  keep_as_map=keep_as_map,
-                  fold_init=0)
+#A fold to compute the sum of the data points
+class SumA(Analysis):
+  def __init__(self, keep_as_map=False):
+    super(SumA, self).__init__(
+      key='sum',
+      keep_as_fold=True,
+      keep_as_map=keep_as_map,
+      fold_init=0)
+  def compute(self, datum, current_analyses, prev_fold):
+    return prev_fold['sum'] + datum
 
+#A fold to count the data points
+class CountA(Analysis):
+  def __init__(self, keep_as_map=False):
+    super(CountA, self).__init__(
+      key='count',
+      keep_as_fold=True,
+      keep_as_map=keep_as_map,
+      fold_init=0)
+  def compute(self, datum, current_analyses, prev_fold):
+    return prev_fold['count'] + 1
 
-#A fold to compute the count
-def count_c(none, current_analyses, prev_fold):
-  return prev_fold['count'] + 1
+#A summary to compute the mean
+class MeanA(Analysis):
+  def __init__(self):
+    super(MeanA, self).__init__(
+      key='mean',
+      parents=set([SumA(), CountA()]),
+      is_summary=True)
+  def compute(self, data, current_analyses, final_fold):
+    return float(final_fold['sum']) / float(final_fold['count'])
 
-def count_a(keep_as_map=False):
-  return Analysis('count',
-                  count_c,
-                  keep_as_fold=True,
-                  keep_as_map=keep_as_map,
-                  fold_init=0)
+#A report for the data mean
+class MeanR(Report):
+  def __init__(self):
+    super(MeanR, self).__init__(
+      key='mean',
+      parents=set([MeanA()]))
+  def report(self, data, analyses, folds):
+    return str(analyses['mean'])
 
-#A summary and report to compute the mean
-def mean_c(none, current_analyses, final_fold):
-  return float(final_fold['sum']) / float(final_fold['count'])
+#A summary to compute the variance of the data
+class VarianceA(Analysis):
+  def __init__(self):
+    super(VarianceA, self).__init__(
+      key='variance',
+      parents=set([MeanA(), SumSquareA(), CountA()]),
+      is_summary=True)
+  def compute(self, data, current_analyses, final_fold):
+    mean_of_squares = float(final_fold['sum_of_squares']) / float(final_fold['count'])
+    square_of_mean = current_analyses['mean']**2
+    return mean_of_squares - square_of_mean
 
-def mean_a():
-  return Analysis('mean', 
-                  mean_c,
-                  parents=set([sum_a(), count_a()]),
-                  is_summary=True)
-
-def mean_rc(none, analyses, folds):
-  return 'mean: ' + str(analyses['mean'])
-
-def mean_report():
-  return Report('mean',
-                mean_rc,
-                parents=set([mean_a()]))
-
-
-#A summary and report to compute the variance
-def variance_c(none, current_analyses, final_fold):
-  mean_of_squares = float(final_fold['sum_of_squares']) / float(final_fold['count'])
-  square_of_mean = current_analyses['mean']**2
-  return mean_of_squares - square_of_mean
-
-def variance_a():
-  return Analysis('variance',
-                  variance_c,
-                  parents=set([mean_a(), sum_square_a(), count_a()]),
-                  is_summary=True)
-
-def variance_rc(none, analyses, folds):
-  return 'variance: ' + str(analyses['variance'])
-
-def variance_report(): 
-  return Report('variance',
-                variance_rc,
-                parents=set([variance_a()]))
+#A report on the variance of the data
+class VarianceR(Report):
+  def __init__(self):
+    super(VarianceR, self).__init__(key='variance',
+      parents=set([VarianceA()]))
+  def report(self, data, analyses, folds):
+    return str(analyses['variance'])
 
 
 if __name__ == '__main__':
   data = [1,2,3,4,5,6,7,8]
   update_function = lambda x: None
   tester = SITL(update_function, data)
-  tester.add_report(mean_report())
-  tester.add_report(variance_report())
+  tester.add_report(MeanR())
+  tester.add_report(VarianceR())
   reports = tester.compute()
   for report in reports.iteritems():
     print '(key=' + report[0] + ') \t' + str(report[1])
