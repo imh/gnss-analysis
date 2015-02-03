@@ -64,6 +64,7 @@ class SITL:
     return reports
 
   def sort_analyses(self):
+    #TODO detect and report cycles
     nodes = self.analyses.keys()
     edges = self.analysis_edges
     s = nodes_without_incoming_edges(nodes, edges)
