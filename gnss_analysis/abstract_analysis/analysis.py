@@ -1,15 +1,14 @@
 
 import inspect
 
-class Analysis:
-  def __init__(self, key, computation, parents=set(), keep_as_map=False, keep_as_fold=False, 
+class Analysis(object):
+  def __init__(self, key, parents=set(), keep_as_map=False, keep_as_fold=False, 
                      fold_init=None, is_summary=False):
     self.parents = parents
     self.key = key
     self.keep_as_map = keep_as_map
     self.keep_as_fold = keep_as_fold
     self.is_summary = is_summary
-    self.computation = computation
     self.fold_init = fold_init
     self.check_valid()
 
@@ -19,7 +18,7 @@ class Analysis:
     self.is_summary = self.is_summary or other.is_summary
 
   def compute(self, data, current_analyses, prev_fold):
-    return self.computation(data, current_analyses, prev_fold)
+    pass
 
   def check_valid(self):
     #make sure that it has good properties
