@@ -88,7 +88,7 @@ def get_timed_ephs(filled_ephs, t):
 
 def construct_pyobj_eph(eph):
   """
-  Turns an ephemeris into the libswiftnav version.
+  Turns ephemeris data into a libswiftnav ephemeris.
 
   Parameters
   ----------
@@ -109,6 +109,30 @@ def construct_pyobj_eph(eph):
              eph['valid'], # this syntax is needed because the method .valid takes precedence to the field
              eph.healthy,
              eph.prn)
+
+def construct_pyobj_sdiff(s):
+  """
+  Turns sdiff data into the libswiftnav sdiff.
+
+  Parameters
+  ----------
+  s : Series
+    A single difference measurement and associated satellite positions.
+
+  Returns
+  -------
+  SingleDiff
+    The same single diff as input, but with the libswiftnav SingleDiff type.
+  """
+  if np.isnan(s.C1):
+      return np.nan
+  return SingleDiff(s.C1,
+                    s.L1,
+                    s.D1,
+                    np.array([s.sat_pos_x, s.sat_pos_y, s.sat_pos_z]), 
+                    np.array([s.sat_vel_x, s.sat_vel_y, s.sat_vel_z]),
+                    s.snr,
+                    s.prn)
 
 def mk_sdiff_series(eph, gpst, sd_obs, prn):
   """
@@ -139,7 +163,6 @@ def mk_sdiff_series(eph, gpst, sd_obs, prn):
                           'sat_pos_x', 'sat_pos_y', 'sat_pos_z',
                           'sat_vel_x', 'sat_vel_y', 'sat_vel_z',
                           'snr', 'prn'])
-
 
 def mk_sdiffs(ephs, local, remote):
   """
@@ -208,7 +231,7 @@ def load_sdiffs(data_filename,
                 key_eph='ephemerises', key_local='local', key_remote='remote',
                 key_sdiff='sdiffs', overwrite=False):
   """
-  Loads sdiffs from and HDF5 file, computing them if needed.
+  Loads sdiffs from an HDF5 file, computing them if needed.
 
   Parameters
   ----------
@@ -230,7 +253,6 @@ def load_sdiffs(data_filename,
     Whether to ignore existing sdiffs in key_sdiff and write new ones
     regardless. (default False)
 
-
   Returns
   -------
   Panel
@@ -239,6 +261,7 @@ def load_sdiffs(data_filename,
   s = pd.HDFStore(data_filename)
   if overwrite or not ('/'+key_sdiff) in s.keys():
     s[key_sdiff] = mk_sdiffs(s[key_eph], s[key_local], s[key_remote])
+    # If a DataFrame of SingleDiffs is desired, use .apply(construct_pyobj_sdiff, axis=1).T
   sd = s[key_sdiff]
   s.close()
   return sd
