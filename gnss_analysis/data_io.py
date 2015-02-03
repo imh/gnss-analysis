@@ -13,12 +13,17 @@ def get_fst_ephs(ephs):
 
   Parameters
   ----------
-  
+  ephs : Panel
+    and ephemeris Panel potentially containing NaN ephemerises
 
   Returns
   -------
-
+  DataFrame
+    A DataFrame whose colums are sats and rows are ephemeris fields.
+    The fields are those of the first ephemeris in the input for which
+    af0 is not NaN.
   """
+  #TODO respect invalid/unhealthy ephemerises
   sats_to_be_found = set(ephs.minor_axis)
   fst_ephs = dict()
   for t in ephs.items:
@@ -31,16 +36,22 @@ def get_fst_ephs(ephs):
 
 def fill_in_ephs(ephs, fst_ephs):
   """
-  
+  Fills in an ephemeris Panel so that there are no missing ephemerises.
 
   Parameters
   ----------
-
+  ephs : Panel
+    A Panel of ephemerises with potentially missing colums
+  fst_ephs : DataFrame
+    A DataFrame of the first non-missing ephemerises for each satellite.
 
   Returns
   -------
-  
+  Panel
+    The same panel as input, except the missing ephemerises are filled in with
+    the most recent ephemeris if there is one, otherwise the first ephemeris.
   """
+  #TODO respect invalid/unhealthy ephemerises
     new_ephs = ephs
     prev_eph = fst_ephs
     for itm in ephs.iteritems():
@@ -55,15 +66,19 @@ def fill_in_ephs(ephs, fst_ephs):
 
 def get_timed_ephs(filled_ephs, t):
   """
-  
+  Finds the most recent ephemeris before a given time.
 
   Parameters
   ----------
-
+  filled_ephs : Panel
+    A Panel of ephemerises with no missing colums
+  t : datetime
+    The time to lookup
 
   Returns
   -------
-  
+  DataFrame
+    The most last ephemerises before t in filled_ephs.
   """
     ephs_before = filled_ephs[filled_ephs.items < t]
     if len(ephs_before.items) > 0:
@@ -73,15 +88,17 @@ def get_timed_ephs(filled_ephs, t):
 
 def construct_pyobj_eph(eph):
   """
-  
+  Turns an ephemeris into the libswiftnav version.
 
   Parameters
   ----------
-
+  eph : Series
+    An ephemeris.
 
   Returns
   -------
-  
+  Ephemeris
+    The same ephemeris as input, but with the libswiftnav Ephemeris type.
   """
     return Ephemeris(
                eph.tgd,
@@ -95,15 +112,23 @@ def construct_pyobj_eph(eph):
 
 def mk_sdiff_series(eph, gpst, sd_obs, prn):
   """
-  
+  Makes a Series with all the fields needed for a sdiff_t, except doppler.
 
   Parameters
   ----------
-
+  eph : Series
+    An ephemeris applicable to this sat and time.
+  gpst : GpsTime
+    The time to compute sat pos/vel for.
+  sd_obs : Series
+    The single differenced observations.
+  prn : int
+    The prn for this sdiff
 
   Returns
   -------
-  
+  Series
+    A series with the same fields as sdiff_t, except that doppler is NaN.  
   """
     pos, vel, clock_err, clock_rate_err = calc_sat_pos(construct_pyobj_eph(eph), gpst)
     return pd.Series([sd_obs['C1'], sd_obs['L1'], np.nan,
@@ -118,15 +143,22 @@ def mk_sdiff_series(eph, gpst, sd_obs, prn):
 
 def mk_sdiffs(ephs, local, remote):
   """
-  
+  Computes everything needed for a timeseries of sdiff_t, dropping
+  sats as appropriate (e.g. lock counts)
 
   Parameters
   ----------
-
+  ephs : Panel
+    The ephemerises to compute sat pos/vel from
+  local : Panel
+    The local receiver's observations
+  remote : Panel
+    The remote receiver's observations
 
   Returns
   -------
-  
+  Panel
+    All the fields needed to construct sdiff_t's.
   """
   ephs = ephs.ix[:, [el for el in ephs.major_axis if el != 'payload'],:]
   obs = sds_with_lock_counts(local, remote)
@@ -176,15 +208,33 @@ def load_sdiffs(data_filename,
                 key_eph='ephemerises', key_local='local', key_remote='remote',
                 key_sdiff='sdiffs', overwrite=False):
   """
-  
+  Loads sdiffs from and HDF5 file, computing them if needed.
 
   Parameters
   ----------
+  data_filename : str
+    The filename of the HDF5 store with all the data.
+  key_eph : str, optional
+    The store's key for the ephemerises.
+    (default 'ephemerises')
+  key_local : str, optional
+    The store's key for the local observations.
+    (default 'local')
+  key_remote : str, optional
+    The store's key for the remote observations.
+    (default 'remote')
+  key_sdiff : str, optional
+    The store's key for the single differenced observations.
+    (default 'sdiffs')
+  overwrite : bool, optional
+    Whether to ignore existing sdiffs in key_sdiff and write new ones
+    regardless. (default False)
 
 
   Returns
   -------
-  
+  Panel
+    A Panel with everything needed to compute sdiff_t.
   """
     s = pd.HDFStore(data_filename)
     if overwrite or not ('/'+key_sdiff) in s.keys():
