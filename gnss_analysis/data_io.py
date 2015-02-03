@@ -52,17 +52,17 @@ def fill_in_ephs(ephs, fst_ephs):
     the most recent ephemeris if there is one, otherwise the first ephemeris.
   """
   #TODO respect invalid/unhealthy ephemerises
-    new_ephs = ephs
-    prev_eph = fst_ephs
-    for itm in ephs.iteritems():
-        t = itm[0]
-        df = itm[1]
-        for sat in df.axes[1]:
-            if np.isnan(df[sat]['af0']):
-                df[sat] = prev_eph[sat]
-        prev_eph = df
-        new_ephs[t] = df
-    return new_ephs
+  new_ephs = ephs
+  prev_eph = fst_ephs
+  for itm in ephs.iteritems():
+    t = itm[0]
+    df = itm[1]
+    for sat in df.axes[1]:
+      if np.isnan(df[sat]['af0']):
+        df[sat] = prev_eph[sat]
+    prev_eph = df
+    new_ephs[t] = df
+  return new_ephs
 
 def get_timed_ephs(filled_ephs, t):
   """
@@ -80,11 +80,11 @@ def get_timed_ephs(filled_ephs, t):
   DataFrame
     The most last ephemerises before t in filled_ephs.
   """
-    ephs_before = filled_ephs[filled_ephs.items < t]
-    if len(ephs_before.items) > 0:
-        return ephs_before.ix[-1]
-    else:
-        return filled_ephs.ix[0]
+  ephs_before = filled_ephs[filled_ephs.items < t]
+  if len(ephs_before.items) > 0:
+    return ephs_before.ix[-1]
+  else:
+    return filled_ephs.ix[0]
 
 def construct_pyobj_eph(eph):
   """
@@ -100,15 +100,15 @@ def construct_pyobj_eph(eph):
   Ephemeris
     The same ephemeris as input, but with the libswiftnav Ephemeris type.
   """
-    return Ephemeris(
-               eph.tgd,
-               eph.crs, eph.crc, eph.cuc, eph.cus, eph.cic, eph.cis,
-               eph.dn, eph.m0, eph.ecc, eph.sqrta, eph.omega0, eph.omegadot, eph.w, eph.inc, eph.inc_dot,
-               eph.af0, eph.af1, eph.af2,
-               GpsTime(eph.toe_wn, eph.toe_tow), GpsTime(eph.toc_wn, eph.toc_tow),
-               eph['valid'], # this syntax is needed because the method .valid takes precedence to the field
-               eph.healthy,
-               eph.prn)
+  return Ephemeris(
+             eph.tgd,
+             eph.crs, eph.crc, eph.cuc, eph.cus, eph.cic, eph.cis,
+             eph.dn, eph.m0, eph.ecc, eph.sqrta, eph.omega0, eph.omegadot, eph.w, eph.inc, eph.inc_dot,
+             eph.af0, eph.af1, eph.af2,
+             GpsTime(eph.toe_wn, eph.toe_tow), GpsTime(eph.toc_wn, eph.toc_tow),
+             eph['valid'], # this syntax is needed because the method .valid takes precedence to the field
+             eph.healthy,
+             eph.prn)
 
 def mk_sdiff_series(eph, gpst, sd_obs, prn):
   """
@@ -130,15 +130,15 @@ def mk_sdiff_series(eph, gpst, sd_obs, prn):
   Series
     A series with the same fields as sdiff_t, except that doppler is NaN.  
   """
-    pos, vel, clock_err, clock_rate_err = calc_sat_pos(construct_pyobj_eph(eph), gpst)
-    return pd.Series([sd_obs['C1'], sd_obs['L1'], np.nan,
-               pos[0], pos[1], pos[2],
-               vel[0], vel[1], vel[2],
-               sd_obs['snr'], prn],
-              index=['C1', 'L1', 'D1',
-                     'sat_pos_x', 'sat_pos_y', 'sat_pos_z',
-                     'sat_vel_x', 'sat_vel_y', 'sat_vel_z',
-                     'snr', 'prn'])
+  pos, vel, clock_err, clock_rate_err = calc_sat_pos(construct_pyobj_eph(eph), gpst)
+  return pd.Series([sd_obs['C1'], sd_obs['L1'], np.nan,
+                    pos[0], pos[1], pos[2],
+                    vel[0], vel[1], vel[2],
+                    sd_obs['snr'], prn],
+                   index=['C1', 'L1', 'D1',
+                          'sat_pos_x', 'sat_pos_y', 'sat_pos_z',
+                          'sat_vel_x', 'sat_vel_y', 'sat_vel_z',
+                          'snr', 'prn'])
 
 
 def mk_sdiffs(ephs, local, remote):
@@ -236,9 +236,9 @@ def load_sdiffs(data_filename,
   Panel
     A Panel with everything needed to compute sdiff_t.
   """
-    s = pd.HDFStore(data_filename)
-    if overwrite or not ('/'+key_sdiff) in s.keys():
-      s[key_sdiff] = mk_sdiffs(s[key_eph], s[key_local], s[key_remote])
-    sd = s[key_sdiff]
-    s.close()
-    return sd
+  s = pd.HDFStore(data_filename)
+  if overwrite or not ('/'+key_sdiff) in s.keys():
+    s[key_sdiff] = mk_sdiffs(s[key_eph], s[key_local], s[key_remote])
+  sd = s[key_sdiff]
+  s.close()
+  return sd
