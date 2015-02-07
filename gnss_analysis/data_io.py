@@ -5,7 +5,7 @@ from pynex.dd_tools import sds_with_lock_counts, sds
 from swiftnav.ephemeris import *
 from swiftnav.single_diff import SingleDiff
 from swiftnav.gpstime import *
-
+from swiftnav.track import NavigationMeasurement
 
 def get_fst_ephs(ephs):
   """
@@ -134,16 +134,16 @@ def construct_pyobj_sdiff(s):
                     s.snr,
                     s.prn)
 
-def mk_sdiff_series(eph, gpst, sd_obs, prn):
+def mk_sdiff_series(sat_pos, sat_vel, sd_obs, prn):
   """
   Makes a Series with all the fields needed for a sdiff_t, except doppler.
 
   Parameters
   ----------
-  eph : Series
-    An ephemeris applicable to this sat and time.
-  gpst : GpsTime
-    The time to compute sat pos/vel for.
+  sat_pos : array[3]
+    The satellite position at the time of this observation
+  sat_vel : array[3]
+    The satellite velocity at the time of this observation
   sd_obs : Series
     The single differenced observations.
   prn : int
@@ -154,20 +154,19 @@ def mk_sdiff_series(eph, gpst, sd_obs, prn):
   Series
     A series with the same fields as sdiff_t, except that doppler is NaN.  
   """
-  pos, vel, clock_err, clock_rate_err = calc_sat_pos(construct_pyobj_eph(eph), gpst)
   return pd.Series([sd_obs['C1'], sd_obs['L1'], np.nan,
-                    pos[0], pos[1], pos[2],
-                    vel[0], vel[1], vel[2],
+                    sat_pos[0], sat_pos[1], sat_pos[2],
+                    sat_vel[0], sat_vel[1], sat_vel[2],
                     sd_obs['snr'], prn],
                    index=['C1', 'L1', 'D1',
                           'sat_pos_x', 'sat_pos_y', 'sat_pos_z',
                           'sat_vel_x', 'sat_vel_y', 'sat_vel_z',
                           'snr', 'prn'])
 
-def mk_sdiffs(ephs, local, remote):
+def mk_sdiffs_and_abs_pos(ephs, local, remote):
   """
   Computes everything needed for a timeseries of sdiff_t, dropping
-  sats as appropriate (e.g. lock counts)
+  sats as appropriate (e.g. lock counts), as well as absolute positions
 
   Parameters
   ----------
@@ -182,9 +181,16 @@ def mk_sdiffs(ephs, local, remote):
   -------
   Panel
     All the fields needed to construct sdiff_t's.
+  DataFrame
+    The local receiver's single point position.
+  DataFrame
+    The remote receiver's single point position.
   """
   ephs = ephs.ix[:, [el for el in ephs.major_axis if el != 'payload'],:]
   obs = sds_with_lock_counts(local, remote)
+  j = obs.transpose(1,0,2).join(
+      local.transpose(1,0,2), rsuffix='_local').join(
+      remote.transpose(1,0,2), rsuffix='_remote').transpose(1,0,2)
 
   fst_ephs = get_fst_ephs(ephs)
   ephs = fill_in_ephs(ephs, fst_ephs)
@@ -194,23 +200,61 @@ def mk_sdiffs(ephs, local, remote):
   
   prev_lock1s = dict()
   prev_lock2s = dict()
+  prev_carr_loc = dict()
+  prev_carr_rem = dict()
   sdiffs = dict()
-  for itm in obs.iteritems():
-    t = itm[0]
+  ecef_loc = dict()
+  ecef_rem = dict()
+  receiver_positions = dict()
+  prev_time = None
+  for t, df in j.iteritems():
     gpst = datetime2gpst(t)
     eph_t = get_timed_ephs(ephs, t)
-    df = itm[1]
+    
     current_lock1s = dict()
     current_lock2s = dict()
+    
+    current_carr_loc = dict()
+    current_carr_rem = dict()
+    
+    dops_loc = dict()
+    dops_rem = dict()
+    
+    sat_poss = dict()
+    sat_vels = dict()
+    clock_errs = dict()
+    
     sdiffs_now = dict()
     for sat in df.axes[1]:
+      sd = df[sat]
+
+      sat_pos, sat_vel, clock_err, clock_rate_err =  \
+        calc_sat_pos(construct_pyobj_eph(eph_t[sat]), gpst)
+      sat_poss[sat] = sat_pos
+      sat_vels[sat] = sat_vel
+      clock_errs[sat] = clock_err
+
+
+      if not np.isnan(sd['L1_local']):
+        current_carr = sd['L1_local']
+        current_carr_loc[sat] = current_carr
+        if sat in prev_carr_loc and not prev_time is None:
+          prev_carr = prev_carr_loc[sat]
+          dops_loc[sat] = (current_carr - prev_carr) / (t-prev_time).total_seconds()
+      if not np.isnan(sd['L1_remote']):
+        current_carr = sd['L1_remote']
+        current_carr_rem[sat] = current_carr
+        if sat in prev_carr_rem and not prev_time is None:
+          prev_carr = prev_carr_rem[sat]
+          dops_rem[sat] = (current_carr - prev_carr) / (t-prev_time).total_seconds()
+
       prev_lock1 = None
       prev_lock2 = None
       if sat in prev_lock1s:
         prev_lock1 = prev_lock1s[sat]
       if sat in prev_lock2s:
         prev_lock2 = prev_lock2s[sat]
-      sd = df[sat]
+      
       lock1 = sd['lock1']
       lock2 = sd['lock2']
       if not np.isnan(lock1):
@@ -221,12 +265,60 @@ def mk_sdiffs(ephs, local, remote):
       lock1_good = (prev_lock1 is None) or (lock1 == prev_lock1)
       lock2_good = (prev_lock2 is None) or (lock2 == prev_lock2)
       if has_info and lock1_good and lock2_good:
-        sdiffs_now[sat] = mk_sdiff_series(eph_t[sat], gpst, sd, sat)
+        sdiffs_now[sat] = mk_sdiff_series(sat_pos, sat_vel, sd, sat)
     prev_lock1s = current_lock1s
     prev_lock2s = current_lock2s
+    prev_carr_loc = current_carr_loc
+    prev_carr_rem = current_carr_rem
+    prev_time = t
     sdiffs[t] = pd.DataFrame(sdiffs_now)
-  return pd.Panel(sdiffs)
+
+    #TODO make a constants binding in libswiftnav-python
+    ecef_loc[t] = pd.Series(compute_ecef((df.ix['C1_local'] + pd.Series(clock_errs) * 299792458.0).dropna(),
+                                         dops_loc, sat_poss, sat_vels, t),
+                      index=['x','y','z'])
+    ecef_rem[t] = pd.Series(compute_ecef((df.ix['C1_remote'] + pd.Series(clock_errs) * 299792458.0).dropna(),
+                                         dops_rem, sat_poss, sat_vels, t),
+                      index=['x','y','z'])
+
+  return pd.Panel(sdiffs), pd.DataFrame(ecef_loc), pd.DataFrame(ecef_rem)
   
+def compute_ecef(pseudoranges, dops, sat_poss, sat_vels, t):
+  """
+  Compute the receiver position if possible, otherwise a vector of NaNs.
+
+  Parameters
+  ----------
+  pseudoranges : Series
+    Pseudoranges, may have NaNs, but the elements for the keys which are also
+    keys in dops, must not be NaN.
+  dops : dict
+    Dopplers, must not have NaNs.
+  sat_poss : dict
+    Satellite positions when this observation was received.
+  sat_vels : dict
+    Satellite velocities when this observation was received.
+
+  Returns
+  -------
+  array
+    The receiver position in ecef if there's enough info in the input to
+    compute it, otherwise an array of NaNs.
+  """
+  if len(dops) < 4:
+    return [np.nan]*3
+  gpst = datetime2gpst(t)
+  nms = []
+  for itm in dops.iteritems():
+    sat = itm[0]
+    dop = itm[1]
+    pseudorange = pseudoranges[sat]
+    sat_pos = sat_poss[sat]
+    sat_vel = sat_vels[sat]
+    nms.append(NavigationMeasurement(pseudorange, pseudorange,
+        np.nan, dop, dop, sat_pos, sat_vel, np.nan, np.nan, gpst.tow, gpst.wn, sat))
+  return calc_PVT(nms).pos_ecef
+
 def load_sdiffs(data_filename,
                 key_eph='ephemerises', key_local='local', key_remote='remote',
                 key_sdiff='sdiffs', overwrite=False):
@@ -260,7 +352,7 @@ def load_sdiffs(data_filename,
   """
   s = pd.HDFStore(data_filename)
   if overwrite or not ('/'+key_sdiff) in s.keys():
-    s[key_sdiff] = mk_sdiffs(s[key_eph], s[key_local], s[key_remote])
+    s[key_sdiff] = mk_sdiffs_and_abs_pos(s[key_eph], s[key_local], s[key_remote])
     # If a DataFrame of SingleDiffs is desired, use .apply(construct_pyobj_sdiff, axis=1).T
   sd = s[key_sdiff]
   s.close()
