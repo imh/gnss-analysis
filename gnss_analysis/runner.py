@@ -47,15 +47,40 @@ def guess_single_point_baselines(local_ecef_df, remote_ecef_df):
   return rem - loc
 
 class DGNSSUpdater(object):
+  """
+  Wraps an update function to be used by the SITL analysis.
+
+  Parameters
+  ----------
+  first_data_point : DataFrame
+    The first set of observations for initializing the filters.
+  local_ecef_df : DataFrame
+    A time series of single point ECEF positions of the local receiver.
+  remote_ecef_df : DataFrame
+    A time series of single point ECEF positions of the remote receiver.
+  """
   def __init__(self, first_data_point, local_ecef_df, remote_ecef_df):
     self.local_ecef = determine_static_ecef(local_ecef_df)
     self.single_point_baseline = \
       guess_single_point_baselines(local_ecef_df, remote_ecef_df)
+    #TODO turn the datum into the necessary format for dgnss_init
     mgmt.dgnss_init(first_data_point, self.local_ecef)
-  def update_fun(self, datum)
+  def update_fun(self, datum):
+    """
+    An state update function to be called by the SITL analyzer.
+
+    Parameters
+    ----------
+    datum : DataFrame
+      A DataFrame of data necessary to create a set of sdiff_t.
+    """
+    #TODO turn the datum into the necessary format for dgnss_update
     mgmt.dgnss_update(datum, self.local_ecef)
 
 def main():
+  """
+  Main entry point for running DGNSS SITL analysis.
+  """
   import argparse
   parser = argparse.ArgumentParser(description='RTK Filter SITL tests.')
   parser.add_argument('file', help='Specify the HDF5 file to use.')
