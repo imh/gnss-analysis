@@ -55,7 +55,6 @@ class SITL:
       prev_fold = current_fold
       maps[i] = current_map
     analyses = pandafy(maps)
-    analyses = maps #TODO analyses need to return columns
     for analysis in self.summary_analyses:
       analyses[analysis.key] = analysis.compute(self.data, analyses, prev_fold)
     reports = dict()
