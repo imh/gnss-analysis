@@ -44,7 +44,7 @@ def guess_single_point_baselines(local_ecef_df, remote_ecef_df):
   """
   loc = determine_static_ecef(local_ecef_df)
   rem = determine_static_ecef(remote_ecef_df)
-  return rem - loc
+  return loc - rem
 
 class DGNSSUpdater(object):
   """
