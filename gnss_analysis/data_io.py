@@ -5,6 +5,7 @@ from pynex.dd_tools import sds_with_lock_counts, sds
 from swiftnav.ephemeris import *
 from swiftnav.single_diff import SingleDiff
 from swiftnav.gpstime import *
+from swiftnav.pvt import calc_PVT
 from swiftnav.track import NavigationMeasurement
 
 def get_fst_ephs(ephs):
@@ -281,7 +282,7 @@ def mk_sdiffs_and_abs_pos(ephs, local, remote):
                                          dops_rem, sat_poss, sat_vels, t),
                       index=['x','y','z'])
 
-  return pd.Panel(sdiffs), pd.DataFrame(ecef_loc), pd.DataFrame(ecef_rem)
+  return pd.Panel(sdiffs), pd.DataFrame(ecef_loc).T, pd.DataFrame(ecef_rem).T
   
 def compute_ecef(pseudoranges, dops, sat_poss, sat_vels, t):
   """
@@ -315,15 +316,19 @@ def compute_ecef(pseudoranges, dops, sat_poss, sat_vels, t):
     pseudorange = pseudoranges[sat]
     sat_pos = sat_poss[sat]
     sat_vel = sat_vels[sat]
+    #TODO, make one of the pseudoranges/dops NaN or actually input and use it,
+    # instead of using either the corrected/raw for both corrected and raw.
     nms.append(NavigationMeasurement(pseudorange, pseudorange,
         np.nan, dop, dop, sat_pos, sat_vel, np.nan, np.nan, gpst.tow, gpst.wn, sat))
   return calc_PVT(nms).pos_ecef
 
-def load_sdiffs(data_filename,
-                key_eph='ephemerises', key_local='local', key_remote='remote',
-                key_sdiff='sdiffs', overwrite=False):
+def load_sdiffs_and_pos(data_filename,
+                        key_eph='ephemerises', key_local='local', key_remote='remote',
+                        key_local_ecef='local_ecef', key_remote_ecef='remote_ecef',
+                        key_sdiff='sdiffs', overwrite=False):
   """
-  Loads sdiffs from an HDF5 file, computing them if needed.
+  Loads sdiffs and single point positions from an HDF5 file,
+  computing them if needed.
 
   Parameters
   ----------
@@ -349,11 +354,20 @@ def load_sdiffs(data_filename,
   -------
   Panel
     A Panel with everything needed to compute sdiff_t.
+  DataFrame
+    A timeseries of the single point positions of the local receiver.
+  DataFrame
+    A timeseries of the single point positions of the remote receiver.
   """
   s = pd.HDFStore(data_filename)
-  if overwrite or not ('/'+key_sdiff) in s.keys():
-    s[key_sdiff] = mk_sdiffs_and_abs_pos(s[key_eph], s[key_local], s[key_remote])
+  if overwrite or not ('/'+key_sdiff) in s.keys() \
+               or not ('/'+key_local_ecef) in s.keys() \
+               or not ('/'+key_remote_ecef) in s.keys():
+    s[key_sdiff], s[key_local_ecef], s[key_remote_ecef] = \
+      mk_sdiffs_and_abs_pos(s[key_eph], s[key_local], s[key_remote])
     # If a DataFrame of SingleDiffs is desired, use .apply(construct_pyobj_sdiff, axis=1).T
   sd = s[key_sdiff]
+  local_ecef = s[key_local_ecef]
+  remote_ecef = s[key_remote_ecef]
   s.close()
-  return sd
+  return sd, local_ecef, remote_ecef
