@@ -1,6 +1,4 @@
 
-import inspect
-
 class Analysis(object):
   def __init__(self, key, parents=set(), keep_as_map=False, keep_as_fold=False, 
                      fold_init=None, is_summary=False):
