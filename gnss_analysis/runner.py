@@ -63,15 +63,15 @@ def mk_swiftnav_sdiff(x):
   SingleDiff or numpy.nan
     If C1 is nan, we return nan, otherwise return a SingleDiff from the Series.
   """
-    if np.isnan(x.C1) 
-        return np.nan
-    return SingleDiff(x.C1,
-                      x.L1,
-                      x.D1,
-                      np.array([x.sat_pos_x, x.sat_pos_y, x.sat_pos_z]), 
-                      np.array([x.sat_vel_x, x.sat_vel_y, x.sat_vel_z]),
-                      x.snr,
-                      x.prn)
+  if np.isnan(x.C1):
+    return np.nan
+  return SingleDiff(x.C1,
+                    x.L1,
+                    x.D1,
+                    np.array([x.sat_pos_x, x.sat_pos_y, x.sat_pos_z]), 
+                    np.array([x.sat_vel_x, x.sat_vel_y, x.sat_vel_z]),
+                    x.snr,
+                    x.prn)
 
 class DGNSSUpdater(object):
   """
