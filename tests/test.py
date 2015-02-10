@@ -115,5 +115,5 @@ if __name__ == '__main__':
   tester.add_report(VarianceR())
   tester.add_report(MeanR2())
   reports = tester.compute()
-  for report in reports.iteritems():
-    print '(key=' + report[0] + ') \t' + str(report[1])
+  for key, report in reports.iteritems():
+    print '(key=' + key + ') \t' + str(report)
