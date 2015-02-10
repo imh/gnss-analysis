@@ -1,8 +1,19 @@
-
+#!/usr/bin/env python
+# Copyright (C) 2015 Swift Navigation Inc.
+# Contact: Ian Horn <ian@swiftnav.com>
+#
+# This source is subject to the license found in the file 'LICENSE' which must
+# be be distributed together with this source. All other rights reserved.
+#
+# THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND,
+# EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE IMPLIED
+# WARRANTIES OF MERCHANTABILITY AND/OR FITNESS FOR A PARTICULAR PURPOSE.
 
 from gnss_analysis.abstract_analysis.manage_tests import SITL
 from gnss_analysis.data_io import load_sdiffs
 import swiftnav.dgnss_management as mgmt
+from gnss_analysis.tests.count import CountR
+
 
 def determine_static_ecef(ecef_df):
   """
@@ -121,11 +132,13 @@ def main():
   updater = DGNSSUpdater(first_datum, local_ecef_df, remote_ecef_df)
   
   tester = SITL(updater.update_function, data)
-  tester.add_report(Foo())
+  tester.add_report(CountR())
   
   reports = tester.compute()
+  for key, report in reports.iteritems():
+    print '(key=' + key + ') \t' + str(report)
 
 
-if __name__ == "__main__"
+if __name__ == "__main__":
   main()
   
