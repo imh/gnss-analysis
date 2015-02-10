@@ -9,9 +9,12 @@
 # EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE IMPLIED
 # WARRANTIES OF MERCHANTABILITY AND/OR FITNESS FOR A PARTICULAR PURPOSE.
 
+
 from gnss_analysis.abstract_analysis.manage_tests import SITL
-from gnss_analysis.data_io import load_sdiffs
+from gnss_analysis.data_io import load_sdiffs_and_pos
 import swiftnav.dgnss_management as mgmt
+from swiftnav.single_diff import SingleDiff
+import numpy as np
 from gnss_analysis.tests.count import CountR
 
 
@@ -102,7 +105,7 @@ class DGNSSUpdater(object):
     self.single_point_baseline = \
       guess_single_point_baselines(local_ecef_df, remote_ecef_df)
     mgmt.dgnss_init(first_data_point.apply(mk_swiftnav_sdiff, axis=0).dropna(), self.local_ecef)
-  def update_fun(self, datum):
+  def update_function(self, datum):
     """
     An state update function to be called by the SITL analyzer.
 
