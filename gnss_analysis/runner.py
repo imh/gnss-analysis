@@ -46,6 +46,33 @@ def guess_single_point_baselines(local_ecef_df, remote_ecef_df):
   rem = determine_static_ecef(remote_ecef_df)
   return loc - rem
 
+def mk_swiftnav_sdiff(x):
+  """
+  Make a libswiftnav sdiff_t from an object with the same elements, 
+  if possible, otherwise returning numpy.nan.
+  We assume here that if C1 is not nan, then nothing else is nan,
+  except potentially D1.
+
+  Parameters
+  ----------
+  x : Series
+    A series with all of the fields needed for a libswiftnav sdiff_t.
+
+  Returns
+  -------
+  SingleDiff or numpy.nan
+    If C1 is nan, we return nan, otherwise return a SingleDiff from the Series.
+  """
+    if np.isnan(x.C1) 
+        return np.nan
+    return SingleDiff(x.C1,
+                      x.L1,
+                      x.D1,
+                      np.array([x.sat_pos_x, x.sat_pos_y, x.sat_pos_z]), 
+                      np.array([x.sat_vel_x, x.sat_vel_y, x.sat_vel_z]),
+                      x.snr,
+                      x.prn)
+
 class DGNSSUpdater(object):
   """
   Wraps an update function to be used by the SITL analysis.
@@ -63,8 +90,7 @@ class DGNSSUpdater(object):
     self.local_ecef = determine_static_ecef(local_ecef_df)
     self.single_point_baseline = \
       guess_single_point_baselines(local_ecef_df, remote_ecef_df)
-    #TODO turn the datum into the necessary format for dgnss_init
-    mgmt.dgnss_init(first_data_point, self.local_ecef)
+    mgmt.dgnss_init(first_data_point.apply(mk_swiftnav_sdiff, axis=0).dropna(), self.local_ecef)
   def update_fun(self, datum):
     """
     An state update function to be called by the SITL analyzer.
@@ -74,8 +100,7 @@ class DGNSSUpdater(object):
     datum : DataFrame
       A DataFrame of data necessary to create a set of sdiff_t.
     """
-    #TODO turn the datum into the necessary format for dgnss_update
-    mgmt.dgnss_update(datum, self.local_ecef)
+    mgmt.dgnss_update(datum.apply(mk_swiftnav_sdiff, axis=0).dropna(), self.local_ecef)
 
 def main():
   """
