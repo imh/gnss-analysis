@@ -42,7 +42,11 @@ class SITL:
     prev_fold = fold_inits(self.non_summary_analyses)
     maps = dict()
 
-    for i, datum in enumerate(self.data):
+    if type(self.data) == pd.Panel:
+      itr = self.data.iteritems()
+    else:
+      itr = enumerate(self.data)
+    for i, datum in itr:
       #initialize
       current_analyses = dict()
       current_fold = dict()
