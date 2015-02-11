@@ -27,12 +27,12 @@ class DatumA(Analysis):
 class SumSquareA(Analysis):
   def __init__(self, keep_as_map=False):
     super(SumSquareA, self).__init__(
-      key='sum_of_squares', 
+      key='sum_of_squares',
       keep_as_fold=True,
       keep_as_map=keep_as_map,
       fold_init=0)
   def compute(self, datum, current_analyses, prev_fold):
-    return prev_fold['sum_of_squares'] + datum**2  
+    return prev_fold['sum_of_squares'] + datum**2
 
 #A fold to compute the sum of the data points
 class SumA(Analysis):

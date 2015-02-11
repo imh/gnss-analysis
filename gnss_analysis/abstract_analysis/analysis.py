@@ -10,7 +10,7 @@
 # WARRANTIES OF MERCHANTABILITY AND/OR FITNESS FOR A PARTICULAR PURPOSE.
 
 class Analysis(object):
-  def __init__(self, key, parents=set(), keep_as_map=False, keep_as_fold=False, 
+  def __init__(self, key, parents=set(), keep_as_map=False, keep_as_fold=False,
                      fold_init=None, is_summary=False):
     self.parents = parents
     self.key = key
@@ -35,7 +35,7 @@ class Analysis(object):
     valid = valid and (self.keep_as_map or self.keep_as_fold or self.is_summary)
     # cannot be map, fold, and summary
     valid = valid and not (self.is_summary and (self.keep_as_map or self.keep_as_fold))
-    # TODO make sure there are no circular dependencies 
+    # TODO make sure there are no circular dependencies
     #      (as of current code structure, shouldn't be possible to make one)
     if not valid:
       #TODO make better exceptions log

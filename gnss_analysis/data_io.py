@@ -20,7 +20,7 @@ from swiftnav.track import NavigationMeasurement
 
 def get_fst_ephs(ephs):
   """
-  Get a DataFrame containing the first non-NaN ephemerises for each sat.  
+  Get a DataFrame containing the first non-NaN ephemerises for each sat.
 
   Parameters
   ----------
@@ -140,7 +140,7 @@ def construct_pyobj_sdiff(s):
   return SingleDiff(s.C1,
                     s.L1,
                     s.D1,
-                    np.array([s.sat_pos_x, s.sat_pos_y, s.sat_pos_z]), 
+                    np.array([s.sat_pos_x, s.sat_pos_y, s.sat_pos_z]),
                     np.array([s.sat_vel_x, s.sat_vel_y, s.sat_vel_z]),
                     s.snr,
                     s.prn)
@@ -163,7 +163,7 @@ def mk_sdiff_series(sat_pos, sat_vel, sd_obs, prn):
   Returns
   -------
   Series
-    A series with the same fields as sdiff_t, except that doppler is NaN.  
+    A series with the same fields as sdiff_t, except that doppler is NaN.
   """
   return pd.Series([sd_obs['C1'], sd_obs['L1'], np.nan,
                     sat_pos[0], sat_pos[1], sat_pos[2],
@@ -208,7 +208,7 @@ def mk_sdiffs_and_abs_pos(ephs, local, remote):
 
   if not set(obs.minor_axis).issubset(set(fst_ephs.axes[1])):
     raise Exception("Not all sats with observations have ephemerises.")
-  
+
   prev_lock1s = dict()
   prev_lock2s = dict()
   prev_carr_loc = dict()
@@ -221,20 +221,20 @@ def mk_sdiffs_and_abs_pos(ephs, local, remote):
   for t, df in j.iteritems():
     gpst = datetime2gpst(t)
     eph_t = get_timed_ephs(ephs, t)
-    
+
     current_lock1s = dict()
     current_lock2s = dict()
-    
+
     current_carr_loc = dict()
     current_carr_rem = dict()
-    
+
     dops_loc = dict()
     dops_rem = dict()
-    
+
     sat_poss = dict()
     sat_vels = dict()
     clock_errs = dict()
-    
+
     sdiffs_now = dict()
     for sat in df.axes[1]:
       sd = df[sat]
@@ -265,7 +265,7 @@ def mk_sdiffs_and_abs_pos(ephs, local, remote):
         prev_lock1 = prev_lock1s[sat]
       if sat in prev_lock2s:
         prev_lock2 = prev_lock2s[sat]
-      
+
       lock1 = sd['lock1']
       lock2 = sd['lock2']
       if not np.isnan(lock1):
@@ -293,7 +293,7 @@ def mk_sdiffs_and_abs_pos(ephs, local, remote):
                       index=['x','y','z'])
 
   return pd.Panel(sdiffs), pd.DataFrame(ecef_loc).T, pd.DataFrame(ecef_rem).T
-  
+
 def compute_ecef(pseudoranges, dops, sat_poss, sat_vels, t):
   """
   Compute the receiver position if possible, otherwise a vector of NaNs.
