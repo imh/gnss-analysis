@@ -25,7 +25,7 @@ class Analysis(object):
     self.keep_as_fold = self.keep_as_fold or other.keep_as_fold
     self.is_summary = self.is_summary or other.is_summary
 
-  def compute(self, data, current_analyses, prev_fold):
+  def compute(self, data, current_analyses, prev_fold, parameters):
     pass
 
   def check_valid(self):

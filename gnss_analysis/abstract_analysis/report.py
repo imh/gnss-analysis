@@ -14,5 +14,5 @@ class Report(object):
     self.key = key
     self.parents = parents
 
-  def report(self, data, analyses, folds):
+  def report(self, data, analyses, folds, parameters):
     pass

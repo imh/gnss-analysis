@@ -12,13 +12,14 @@
 import pandas as pd
 
 class SITL:
-  def __init__(self, update_function, data):
+  def __init__(self, update_function, data, parameters=None):
     self.analyses = dict()
     self.non_summary_analyses = []
     self.summary_analyses = []
     self.reports = set()
     self.analysis_edges = set()
     self.data = data
+    self.parameters = parameters
     self.all_maps = None
     self.update_function = update_function
 
@@ -53,11 +54,11 @@ class SITL:
       current_map = dict()
 
       #update
-      self.update_function(datum)
+      self.update_function(datum, self.parameters)
 
       # compute everything and put it away for other computations
       for analysis in self.non_summary_analyses:
-        comp = analysis.compute(datum, current_analyses, prev_fold)
+        comp = analysis.compute(datum, current_analyses, prev_fold, self.parameters)
         key = analysis.key
         if analysis.keep_as_map:
           current_map[key] = comp
@@ -70,10 +71,10 @@ class SITL:
       maps[i] = current_map
     analyses = pandafy(maps)
     for analysis in self.summary_analyses:
-      analyses[analysis.key] = analysis.compute(self.data, analyses, prev_fold)
+      analyses[analysis.key] = analysis.compute(self.data, analyses, prev_fold, self.parameters)
     reports = dict()
     for report in self.reports:
-      reports[report.key] = report.report(self.data, analyses, prev_fold)
+      reports[report.key] = report.report(self.data, analyses, prev_fold, self.parameters)
     return reports
 
   def sort_analyses(self):

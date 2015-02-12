@@ -16,6 +16,7 @@ import swiftnav.dgnss_management as mgmt
 from swiftnav.single_diff import SingleDiff
 import numpy as np
 from gnss_analysis.tests.count import CountR
+from gnss_analysis.tests.iar_bools import FixedIARBegunR, FixedIARCompletedR
 
 
 def determine_static_ecef(ecef_df):
@@ -136,6 +137,8 @@ def main():
 
   tester = SITL(updater.update_function, data)
   tester.add_report(CountR())
+  tester.add_report(FixedIARBegunR())
+  tester.add_report(FixedIARCompletedR())
 
   reports = tester.compute()
   for key, report in reports.iteritems():

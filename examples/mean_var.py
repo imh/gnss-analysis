@@ -20,7 +20,7 @@ class DatumA(Analysis):
     super(DatumA, self).__init__(
       key='data',
       keep_as_map=True)
-  def compute(self, datum, current_analyses, prev_fold):
+  def compute(self, datum, current_analyses, prev_fold, parameters):
     return datum
 
 #A fold to compute the sum of squares of the data points
@@ -31,7 +31,7 @@ class SumSquareA(Analysis):
       keep_as_fold=True,
       keep_as_map=keep_as_map,
       fold_init=0)
-  def compute(self, datum, current_analyses, prev_fold):
+  def compute(self, datum, current_analyses, prev_fold, parameters):
     return prev_fold['sum_of_squares'] + datum**2
 
 #A fold to compute the sum of the data points
@@ -42,7 +42,7 @@ class SumA(Analysis):
       keep_as_fold=True,
       keep_as_map=keep_as_map,
       fold_init=0)
-  def compute(self, datum, current_analyses, prev_fold):
+  def compute(self, datum, current_analyses, prev_fold, parameters):
     return prev_fold['sum'] + datum
 
 #A fold to count the data points
@@ -53,7 +53,7 @@ class CountA(Analysis):
       keep_as_fold=True,
       keep_as_map=keep_as_map,
       fold_init=0)
-  def compute(self, datum, current_analyses, prev_fold):
+  def compute(self, datum, current_analyses, prev_fold, parameters):
     return prev_fold['count'] + 1
 
 #A summary to compute the mean from folds
@@ -63,7 +63,7 @@ class MeanA(Analysis):
       key='mean',
       parents=set([SumA(), CountA()]),
       is_summary=True)
-  def compute(self, data, current_analyses, final_fold):
+  def compute(self, data, current_analyses, final_fold, parameters):
     return float(final_fold['sum']) / float(final_fold['count'])
 
 #A report for the data mean from folds
@@ -72,7 +72,7 @@ class MeanR(Report):
     super(MeanR, self).__init__(
       key='mean',
       parents=set([MeanA()]))
-  def report(self, data, analyses, folds):
+  def report(self, data, analyses, folds, parameters):
     return str(analyses['mean'])
 
 #A summary to compute the mean from maps
@@ -82,7 +82,7 @@ class MeanA2(Analysis):
       key='mean2',
       parents=set([DatumA()]),
       is_summary=True)
-  def compute(self, data, current_analyses, folds):
+  def compute(self, data, current_analyses, folds, parameters):
     print current_analyses['data'].mean()
     return current_analyses['data'].mean()
 
@@ -92,7 +92,7 @@ class MeanR2(Report):
     super(MeanR2, self).__init__(
       key='mean2',
       parents=set([MeanA2()]))
-  def report(self, data, analyses, folds):
+  def report(self, data, analyses, folds, parameters):
     return str(analyses['mean2'])
 
 #A summary to compute the variance of the data
@@ -102,7 +102,7 @@ class VarianceA(Analysis):
       key='variance',
       parents=set([MeanA(), SumSquareA(), CountA()]),
       is_summary=True)
-  def compute(self, data, current_analyses, final_fold):
+  def compute(self, data, current_analyses, final_fold, parameters):
     mean_of_squares = float(final_fold['sum_of_squares']) / float(final_fold['count'])
     square_of_mean = current_analyses['mean']**2
     return mean_of_squares - square_of_mean
@@ -112,14 +112,14 @@ class VarianceR(Report):
   def __init__(self):
     super(VarianceR, self).__init__(key='variance',
       parents=set([VarianceA()]))
-  def report(self, data, analyses, folds):
+  def report(self, data, analyses, folds, parameters):
     return str(analyses['variance'])
 
 
 if __name__ == '__main__':
   data = [1,2,3,4,5,6,7,8]
-  update_function = lambda x: None
-  tester = SITL(update_function, data)
+  update_function = lambda x, y: None
+  tester = SITL(update_function, data, None)
   tester.add_report(MeanR())
   tester.add_report(VarianceR())
   tester.add_report(MeanR2())
