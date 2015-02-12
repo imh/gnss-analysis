@@ -15,7 +15,7 @@ except ImportError:
 
 setup(name='gnss_analysis',
       description='Software-in-the-loop testing for libswiftnav RTK filters',
-      version='0.22',
+      version='0.23',
       author='Swift Navigation',
       author_email='ian@swiftnav.com',
       maintainer='Ian Horn',

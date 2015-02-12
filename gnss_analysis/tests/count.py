@@ -20,7 +20,7 @@ class CountA(Analysis):
       keep_as_fold=True,
       keep_as_map=keep_as_map,
       fold_init=0)
-  def compute(self, datum, current_analyses, prev_fold):
+  def compute(self, datum, current_analyses, prev_fold, parameters):
     return prev_fold['count'] + 1
 
 class CountR(Report):
@@ -28,5 +28,5 @@ class CountR(Report):
     super(CountR, self).__init__(
       key='count',
       parents=set([CountA()]))
-  def report(self, data, analyses, folds):
+  def report(self, data, analyses, folds, parameters):
     return str(folds['count'])
