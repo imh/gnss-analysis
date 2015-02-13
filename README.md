@@ -56,8 +56,8 @@ whose parents are `Analysis` nodes. A `Report` cannot depend on a
 `Report`. `Analysis` nodes have `compute` methods their children depend on.
 `Report` nodes have `report` that is spit out at the end.
 
-Their dependencies are specified in via a `set` passed into `parents` argument
-of their constructors.
+Their dependencies are specified in via a `set` passed intothe `parents`
+argument of their constructors.
 
 ### Analysis
 
@@ -78,8 +78,9 @@ This flag indicates that the result of its `compute` should be stored in the
 dictionary of current fold results, to be passed back in at the next data
 point. It can also be stored as a map via `keep_as_map=True`.
   - A fold's `compute` function takes as arguments a data point, the
-result of the `compute` function of its dependencies, and the result of its
-own `compute` function on the previous data point.
+result of the `compute` function of its dependencies, the result of its
+own `compute` function on the previous data point, and some `parameters`
+from the `SITL`.
   - In its constructor, it takes an initial "previous result."
   - A fold can depend on other folds and maps.
   - You could do everything in a fold node, but don't. It's bad and you should
@@ -89,22 +90,23 @@ feel bad.
 This flag indicates that the result of its `compute` function should be stored
 separately for each data point. It can also be stored as a fold via
 `keep_as_fold=True`.
-  - A maps's `compute` function takes as arguments a data point and the result
-of the `compute` function of its dependencies. These dependencies will be input
-in the `current_analyses` argument. (It also takes the previous folds, just to
-have a common type signature, but should not use them)
+  - A maps's `compute` function takes as arguments a data point, the result
+of the `compute` function of its dependencies, and some `parameters`
+from the `SITL`. These dependencies will be input in the `current_analyses`
+ argument. (It also takes the previous folds, just to have a common type
+ signature, but should not use them)
   - A map can depend on folds and other maps.
 - **Summaries:**
   - A summary node is an `Analysis` with `is_summary=True` in the constructor.
   - The results of a summary node's `compute` function cannot also be stored
 as a map or fold.
-  - A summary's `compute` function takes as arguments the whole data set and
-the result of the `compute` functions of its dependencies. The map and summary
-dependencies will be input via the `current_analyses` argument, and the folds
-will be input via the fold argument.
+  - A summary's `compute` function takes as arguments the whole data set,
+the result of the `compute` functions of its dependencies, and some `parameters`
+from the `SITL`. The map and summary dependencies will be input via the
+`current_analyses` argument, and the folds will be input via the fold argument.
   - A summary can depend on folds, maps and other summaries.
-  - You could do everything in a summary node, but don't. It's bad and you should
-feel bad.
+  - You could do everything in a single summary node, but don't. It's bad and
+you should feel bad.
 
 ### Report
 
@@ -116,16 +118,18 @@ the second will be used, but all the dependencies of the original will be
 executed.
 
 - `report` takes the same arguments as the `compute` of a summary `Analysis`
-node.
+node, and some `parameters` from the `SITL`.
 - `report` should return a string. This will be output from the program.
 - A report can can depend on folds, maps, and summaries.
 
 ## SITL
 
 `SITL` is the class that manages the DAG of `Report` and `Analysis`
-dependencies and computations. You initialize it with a data set and an update
-step which will be executed before any of the computations on each data point.
-The update function is useful for updating any global states.
+dependencies and computations. You initialize it with a data set, an update
+step which will be executed before any of the computations on each data point,
+and some object to be passed to all the `Report` and `Analysis` functions. It
+serves as extra parameters. The update function is useful for updating any
+global states.
 
 You add the reports you want computed to the `SITL` object via `.add_report`
 and it will add any analyses necessary to compute the report. The reports are
