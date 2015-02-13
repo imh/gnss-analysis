@@ -12,11 +12,11 @@
 
 from gnss_analysis.abstract_analysis.manage_tests import SITL
 from gnss_analysis.data_io import load_sdiffs_and_pos
+import gnss_analysis.utils as ut
 import swiftnav.dgnss_management as mgmt
-from swiftnav.single_diff import SingleDiff
 import numpy as np
 from gnss_analysis.tests.count import CountR
-from gnss_analysis.tests.iar_bools import FixedIARBegunR, FixedIARCompletedR
+from gnss_analysis.tests.iar_bools import *
 
 
 def determine_static_ecef(ecef_df):
@@ -61,32 +61,7 @@ def guess_single_point_baselines(local_ecef_df, remote_ecef_df):
   rem = determine_static_ecef(remote_ecef_df)
   return loc - rem
 
-def mk_swiftnav_sdiff(x):
-  """
-  Make a libswiftnav sdiff_t from an object with the same elements,
-  if possible, otherwise returning numpy.nan.
-  We assume here that if C1 is not nan, then nothing else is nan,
-  except potentially D1.
 
-  Parameters
-  ----------
-  x : Series
-    A series with all of the fields needed for a libswiftnav sdiff_t.
-
-  Returns
-  -------
-  SingleDiff or numpy.nan
-    If C1 is nan, we return nan, otherwise return a SingleDiff from the Series.
-  """
-  if np.isnan(x.C1):
-    return np.nan
-  return SingleDiff(x.C1,
-                    x.L1,
-                    x.D1,
-                    np.array([x.sat_pos_x, x.sat_pos_y, x.sat_pos_z]),
-                    np.array([x.sat_vel_x, x.sat_vel_y, x.sat_vel_z]),
-                    x.snr,
-                    x.prn)
 
 class DGNSSUpdater(object):
   """
@@ -102,7 +77,7 @@ class DGNSSUpdater(object):
     A time series of single point ECEF positions of the remote receiver.
   """
   def __init__(self, first_data_point, local_ecef):
-    mgmt.dgnss_init(first_data_point.apply(mk_swiftnav_sdiff, axis=0).dropna(), local_ecef)
+    mgmt.dgnss_init(first_data_point.apply(ut.mk_swiftnav_sdiff, axis=0).dropna(), local_ecef)
   def update_function(self, datum, parameters):
     """
     An state update function to be called by the SITL analyzer.
@@ -112,16 +87,17 @@ class DGNSSUpdater(object):
     datum : DataFrame
       A DataFrame of data necessary to create a set of sdiff_t.
     """
-    mgmt.dgnss_update(datum.apply(mk_swiftnav_sdiff, axis=0).dropna(), parameters.local_ecef)
+    mgmt.dgnss_update(datum.apply(ut.mk_swiftnav_sdiff, axis=0).dropna(), parameters.local_ecef)
 
 class DGNSSParameters(object):
   """
   Holds parameters used during state updating and analysis.
   """
-  def __init__(self, local_ecef_df, remote_ecef_df):
+  def __init__(self, known_baseline, local_ecef_df, remote_ecef_df):
     self.local_ecef = determine_static_ecef(local_ecef_df)
     self.single_point_baseline = \
       guess_single_point_baselines(local_ecef_df, remote_ecef_df)
+    self.known_baseline = known_baseline
 
 def main():
   """
@@ -139,13 +115,16 @@ def main():
   first_datum = data.ix[0]
   data = data.ix[1:]
 
-  parameters = DGNSSParameters(local_ecef_df, remote_ecef_df)
+  known_baseline = np.array([0,0,0])
+  parameters = DGNSSParameters(known_baseline, local_ecef_df, remote_ecef_df)
   updater = DGNSSUpdater(first_datum, parameters.local_ecef)
 
   tester = SITL(updater.update_function, data, parameters)
   tester.add_report(CountR())
   tester.add_report(FixedIARBegunR())
   tester.add_report(FixedIARCompletedR())
+  tester.add_report(FixedIARLeastSquareStartedInPoolR())
+  tester.add_report(FixedIARLeastSquareEndedInPoolR())
 
   reports = tester.compute()
   for key, report in reports.iteritems():
