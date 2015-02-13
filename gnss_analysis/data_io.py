@@ -206,7 +206,8 @@ def mk_sdiffs_and_abs_pos(ephs, local, remote):
   fst_ephs = get_fst_ephs(ephs)
   ephs = fill_in_ephs(ephs, fst_ephs)
 
-  if not set(obs.minor_axis).issubset(set(fst_ephs.axes[1])):
+  j = j.ix[:, :, [sat for sat in fst_ephs.axes[1]]]
+  if not set(j.minor_axis).issubset(set(fst_ephs.axes[1])):
     raise Exception("Not all sats with observations have ephemerises.")
 
   prev_lock1s = dict()
