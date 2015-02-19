@@ -17,6 +17,7 @@ import swiftnav.dgnss_management as mgmt
 import numpy as np
 from gnss_analysis.tests.count import CountR
 from gnss_analysis.tests.iar_bools import *
+from gnss_analysis.tests.kf_internals import *
 
 
 def determine_static_ecef(ecef_df):
@@ -99,17 +100,11 @@ class DGNSSParameters(object):
       guess_single_point_baselines(local_ecef_df, remote_ecef_df)
     self.known_baseline = known_baseline
 
-def main():
+def run(hdf5_filename):
   """
-  Main entry point for running DGNSS SITL analysis.
+  ALternative entry point for running DGNSS SITL analysis.
   """
-  import argparse
-  parser = argparse.ArgumentParser(description='RTK Filter SITL tests.')
-  parser.add_argument('file', help='Specify the HDF5 file to use.')
-  args = parser.parse_args()
-  hdf5_file = args.file
-
-  data, local_ecef_df, remote_ecef_df = load_sdiffs_and_pos(hdf5_file)
+  data, local_ecef_df, remote_ecef_df = load_sdiffs_and_pos(hdf5_filename)
   if len(data.items) < 2:
     raise Exception("Data must contain at least two observations.")
   first_datum = data.ix[0]
@@ -125,10 +120,26 @@ def main():
   tester.add_report(FixedIARCompletedR())
   tester.add_report(FixedIARLeastSquareStartedInPoolR())
   tester.add_report(FixedIARLeastSquareEndedInPoolR())
+  tester.add_report(KFSatsR())
+  tester.add_report(KFMeanR())
 
-  reports = tester.compute()
+  return tester.compute()
+
+def main():
+  """
+  Main entry point for running DGNSS SITL analysis.
+  """
+  import argparse
+  parser = argparse.ArgumentParser(description='RTK Filter SITL tests.')
+  parser.add_argument('file', help='Specify the HDF5 file to use.')
+  args = parser.parse_args()
+  hdf5_filename = args.file
+
+  reports = run(hdf5_filename)
   for key, report in reports.iteritems():
     print '(key=' + key + ') \t' + str(report)
+
+
 
 
 if __name__ == "__main__":

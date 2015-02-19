@@ -98,7 +98,14 @@ class FixedIARLeastSquareStartedInPool(Analysis):
       fold_init=False)
   def compute(self, data, current_analyses, prev_fold, parameters):
     if current_analyses['FixedIARBegun'] and not prev_fold['FixedIARBegun']:
-      return current_analyses['FixedIARLeastSquareInPool']
+      dat = data.apply(ut.mk_swiftnav_sdiff, axis=0).dropna()
+      iar_de, iar_phase = mgmt.get_iar_de_and_phase(
+        dat, parameters.local_ecef + 0.5 * parameters.known_baseline)
+      ia_vec_from_b = ut.get_N_from_b(iar_phase,
+                                      iar_de,
+                                      parameters.known_baseline)
+      return mgmt.dgnss_iar_pool_contains(ia_vec_from_b)
+      # return current_analyses['FixedIARLeastSquareInPool']
     return prev_fold['FixedIARLeastSquareStartedInPool']
 
 class FixedIARLeastSquareEndedInPool(Analysis):
@@ -110,7 +117,14 @@ class FixedIARLeastSquareEndedInPool(Analysis):
       fold_init=False)
   def compute(self, data, current_analyses, prev_fold, parameters):
     if current_analyses['FixedIARCompleted'] and not prev_fold['FixedIARCompleted']:
-      return current_analyses['FixedIARLeastSquareInPool']
+      dat = data.apply(ut.mk_swiftnav_sdiff, axis=0).dropna()
+      iar_de, iar_phase = mgmt.get_iar_de_and_phase(
+        dat, parameters.local_ecef + 0.5 * parameters.known_baseline)
+      ia_vec_from_b = ut.get_N_from_b(iar_phase,
+                                      iar_de,
+                                      parameters.known_baseline)
+      return mgmt.dgnss_iar_pool_contains(ia_vec_from_b)
+      # return current_analyses['FixedIARLeastSquareInPool']
     return prev_fold['FixedIARLeastSquareEndedInPool']
 
 class FixedIARBegunR(Report):
