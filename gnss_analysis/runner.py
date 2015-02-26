@@ -100,28 +100,36 @@ class DGNSSParameters(object):
       guess_single_point_baselines(local_ecef_df, remote_ecef_df)
     self.known_baseline = known_baseline
 
-def run(hdf5_filename):
+reports = [ CountR()
+          , FixedIARBegunR()
+          , FixedIARCompletedR()
+          , FixedIARLeastSquareStartedInPoolR()
+          , FixedIARLeastSquareEndedInPoolR()
+          # , KFSatsR()
+          # , KFMeanR()
+          # , KFCovR()
+          ]
+
+def run(hdf5_filename, reports=reports):
   """
   ALternative entry point for running DGNSS SITL analysis.
   """
   data, local_ecef_df, remote_ecef_df = load_sdiffs_and_pos(hdf5_filename)
   if len(data.items) < 2:
     raise Exception("Data must contain at least two observations.")
-  first_datum = data.ix[0]
-  data = data.ix[1:]
+  # data = data.ix[:,:,[0,2,22,30,31]]
+  first_datum = data.ix[1]
+  data = data.ix[2:]
 
   known_baseline = np.array([0,0,0])
   parameters = DGNSSParameters(known_baseline, local_ecef_df, remote_ecef_df)
   updater = DGNSSUpdater(first_datum, parameters.local_ecef)
 
+  initial_sats = mgmt.get_sats_management()[1]
+  initial_means = mgmt.get_amb_kf_mean()
+
   tester = SITL(updater.update_function, data, parameters)
-  tester.add_report(CountR())
-  tester.add_report(FixedIARBegunR())
-  tester.add_report(FixedIARCompletedR())
-  tester.add_report(FixedIARLeastSquareStartedInPoolR())
-  tester.add_report(FixedIARLeastSquareEndedInPoolR())
-  tester.add_report(KFSatsR())
-  tester.add_report(KFMeanR())
+  tester.add_reports(reports)
 
   return tester.compute()
 

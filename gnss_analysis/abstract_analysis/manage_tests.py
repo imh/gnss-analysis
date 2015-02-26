@@ -23,6 +23,9 @@ class SITL:
     self.all_maps = None
     self.update_function = update_function
 
+  def add_reports(self, reports):
+    for report in reports:
+      self.add_report(report)
 
   def add_report(self, report):
     self.reports.add(report)

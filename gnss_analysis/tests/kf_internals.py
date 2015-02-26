@@ -42,6 +42,17 @@ class KFMean(Analysis):
   def compute(self, data, current_analyses, prev_fold, parameters):
     return mgmt.get_amb_kf_mean()
 
+class KFCov(Analysis):
+  """
+  The KF state estimate covariance matrix.
+  """
+  def __init__(self):
+    super(KFCov, self).__init__(
+      key='KFCov',
+      keep_as_map=True)
+  def compute(self, data, current_analyses, prev_fold, parameters):
+    return mgmt.get_amb_kf_cov2()
+
 class KFSatsR(Report):
   """
   A time series of sats used by the KF.
@@ -63,3 +74,14 @@ class KFMeanR(Report):
       parents=set([KFMean()]))
   def report(self, data, analyses, folds, parameters):
     return analyses['KFMean']
+
+class KFCovR(Report):
+  """
+  A time series of KF state estimate covariance matrices.
+  """
+  def __init__(self):
+    super(KFCovR, self).__init__(
+      key="KFCov",
+      parents=set([KFCov()]))
+  def report(self, data, analyses, folds, parameters):
+    return analyses['KFCov']

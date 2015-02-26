@@ -12,6 +12,7 @@
 from gnss_analysis.abstract_analysis.analysis import *
 from gnss_analysis.abstract_analysis.report import *
 import gnss_analysis.utils as ut
+import sbp_log_analysis.metrics_schema as ms
 import swiftnav.dgnss_management as mgmt
 
 # Is the actual IA vector in the set of hyps initially generated?
@@ -135,7 +136,8 @@ class FixedIARBegunR(Report):
   def __init__(self):
     super(FixedIARBegunR, self).__init__(
       key='FixedIARBegun',
-      parents=set([FixedIARBegun()]))
+      parents=set([FixedIARBegun()]),
+      dist_type=ms.DistType.BINOMIAL)
   def report(self, data, analyses, folds, parameters):
     return folds['FixedIARBegun']
 
@@ -147,7 +149,8 @@ class FixedIARCompletedR(Report):
   def __init__(self):
     super(FixedIARCompletedR, self).__init__(
       key='FixedIARCompleted',
-      parents=set([FixedIARCompleted()]))
+      parents=set([FixedIARCompleted()]),
+      dist_type=ms.DistType.BINOMIAL)
   def report(self, data, analyses, folds, parameters):
     return folds['FixedIARCompleted']
 
@@ -155,7 +158,8 @@ class FixedIARLeastSquareStartedInPoolR(Report):
   def __init__(self):
     super(FixedIARLeastSquareStartedInPoolR, self).__init__(
       key='FixedIARLeastSquareStartedInPool',
-      parents=set([FixedIARLeastSquareStartedInPool()]))
+      parents=set([FixedIARLeastSquareStartedInPool()]),
+      dist_type=ms.DistType.BINOMIAL)
   def report(self, data, analyses, folds, parameters):
     return folds['FixedIARLeastSquareStartedInPool']
 
@@ -163,6 +167,7 @@ class FixedIARLeastSquareEndedInPoolR(Report):
   def __init__(self):
     super(FixedIARLeastSquareEndedInPoolR, self).__init__(
       key='FixedIARLeastSquareEndedInPool',
-      parents=set([FixedIARLeastSquareEndedInPool()]))
+      parents=set([FixedIARLeastSquareEndedInPool()]),
+      dist_type=ms.DistType.BINOMIAL)
   def report(self, data, analyses, folds, parameters):
     return folds['FixedIARLeastSquareEndedInPool']

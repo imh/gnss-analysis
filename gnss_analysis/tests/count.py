@@ -27,6 +27,7 @@ class CountR(Report):
   def __init__(self):
     super(CountR, self).__init__(
       key='count',
-      parents=set([CountA()]))
+      parents=set([CountA()]),
+      dist_type=ms.DistType.EMPIRICAL)
   def report(self, data, analyses, folds, parameters):
     return str(folds['count'])
