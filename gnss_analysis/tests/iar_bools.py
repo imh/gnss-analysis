@@ -80,7 +80,7 @@ class FixedIARLeastSquareInPool(Analysis):
       parents=set([FixedIARBegun()]),
       keep_as_map=True)
   def compute(self, data, current_analyses, prev_fold, parameters):
-    if current_analyses['FixedIARBegun']:
+    if current_analyses['FixedIARBegun'] and mgmt.dgnss_iar_num_sats() >= 4:
       dat = data.apply(ut.mk_swiftnav_sdiff, axis=0).dropna()
       iar_de, iar_phase = mgmt.get_iar_de_and_phase(
         dat, parameters.local_ecef + 0.5 * parameters.known_baseline)
@@ -94,7 +94,7 @@ class FixedIARLeastSquareStartedInPool(Analysis):
   def __init__(self):
     super(FixedIARLeastSquareStartedInPool, self).__init__(
       key='FixedIARLeastSquareStartedInPool',
-      parents=set([FixedIARBegun(), FixedIARLeastSquareInPool()]),
+      parents=set([FixedIARBegun()]),
       keep_as_fold=True,
       fold_init=False)
   def compute(self, data, current_analyses, prev_fold, parameters):
@@ -113,7 +113,7 @@ class FixedIARLeastSquareEndedInPool(Analysis):
   def __init__(self):
     super(FixedIARLeastSquareEndedInPool, self).__init__(
       key='FixedIARLeastSquareEndedInPool',
-      parents=set([FixedIARCompleted(), FixedIARLeastSquareInPool()]),
+      parents=set([FixedIARCompleted()]),
       keep_as_fold=True,
       fold_init=False)
   def compute(self, data, current_analyses, prev_fold, parameters):

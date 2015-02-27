@@ -31,6 +31,20 @@ class KFSats(Analysis):
       return None
     return prns[0], prns[1:]
 
+class KFNumSats(Analysis):
+  """
+  How many sats the KF is using.
+  """
+  def __init__(self):
+    super(KFNumSats, self).__init__(
+      key='KFNumSats',
+      keep_as_map=True)
+  def compute(self, data, current_analyses, prev_fold, parameters):
+    prns = mgmt.get_sats_management()[1]
+    if len(prns) < 2:
+      return 0
+    return len(prns)
+
 class KFMean(Analysis):
   """
   The KF state estimates.
@@ -63,6 +77,17 @@ class KFSatsR(Report):
       parents=set([KFSats()]))
   def report(self, data, analyses, folds, parameters):
     return analyses['KFSats']
+
+class KFNumSatsR(Report):
+  """
+  A time series of how many sats are used by the KF.
+  """
+  def __init__(self):
+    super(KFNumSatsR, self).__init__(
+      key="KFNumSats",
+      parents=set([KFNumSats()]))
+  def report(self, data, analyses, folds, parameters):
+    return analyses['KFNumSats']
 
 class KFMeanR(Report):
   """

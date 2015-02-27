@@ -18,6 +18,10 @@ def main():
   parser = argparse.ArgumentParser(description='RTK Filter SITL tests.')
   parser.add_argument('infile', help='Specify the HDF5 file to use for input.')
   parser.add_argument('outfile', help='Specify the HDF5 file to output into.')
+  parser.add_argument('baselineX', help='The baseline north component.')
+  parser.add_argument('baselineY', help='The baseline east  component.')
+  parser.add_argument('baselineZ', help='The baseline down component.')
+  parser.add_argument('--NED', action='store_true')
   parser.add_argument('-k', '--key',
                       default='table', nargs=1,
                       help='The key for the output table to insert into.')
@@ -28,12 +32,19 @@ def main():
   args = parser.parse_args()
   hdf5_filename_in = args.infile
   hdf5_filename_out = args.outfile
+  baselineX = args.baselineX
+  baselineY = args.baselineY
+  baselineZ = args.baselineZ
+  baseline = np.array(map(float,[baselineX, baselineY, baselineZ]))
   out_key = args.key
   row = args.row
   if row is None:
     row = hdf5_filename_in
 
-  reports = single_run(hdf5_filename_in)
+  # out_key = hdf5_filename_in.split('/')[-1].split('.')[0]
+  # print 'hdf5_filename_in = ' + str(hdf5_filename_in)
+  # print 'OUT_KEY = ' + out_key
+  reports = single_run(hdf5_filename_in, baseline, baseline_is_NED=args.NED)
 
   out_store = pd.HDFStore(hdf5_filename_out)
   if ('/' + out_key) in out_store.keys():

@@ -18,7 +18,8 @@ import numpy as np
 from gnss_analysis.tests.count import CountR
 from gnss_analysis.tests.iar_bools import *
 from gnss_analysis.tests.kf_internals import *
-
+from gnss_analysis.tests.outputs import *
+import swiftnav.coord_system as cs
 
 def determine_static_ecef(ecef_df):
   """
@@ -94,23 +95,28 @@ class DGNSSParameters(object):
   """
   Holds parameters used during state updating and analysis.
   """
-  def __init__(self, known_baseline, local_ecef_df, remote_ecef_df):
+  def __init__(self, known_baseline, local_ecef_df, remote_ecef_df, baseline_is_NED):
     self.local_ecef = determine_static_ecef(local_ecef_df)
     self.single_point_baseline = \
       guess_single_point_baselines(local_ecef_df, remote_ecef_df)
-    self.known_baseline = known_baseline
+    if baseline_is_NED:
+      self.known_baseline = cs.wgsned2ecef(known_baseline, self.local_ecef)
+    else:
+      self.known_baseline = known_baseline
 
 reports = [ CountR()
           , FixedIARBegunR()
           , FixedIARCompletedR()
           , FixedIARLeastSquareStartedInPoolR()
           , FixedIARLeastSquareEndedInPoolR()
+          # , FloatBaselineR()
+          # , FixedBaselineR()
           # , KFSatsR()
           # , KFMeanR()
           # , KFCovR()
           ]
 
-def run(hdf5_filename, reports=reports):
+def run(hdf5_filename, known_baseline, reports=reports, baseline_is_NED=False):
   """
   ALternative entry point for running DGNSS SITL analysis.
   """
@@ -121,8 +127,9 @@ def run(hdf5_filename, reports=reports):
   first_datum = data.ix[1]
   data = data.ix[2:]
 
-  known_baseline = np.array([0,0,0])
-  parameters = DGNSSParameters(known_baseline, local_ecef_df, remote_ecef_df)
+  parameters = DGNSSParameters(known_baseline, local_ecef_df, remote_ecef_df, baseline_is_NED)
+  print parameters.known_baseline
+
   updater = DGNSSUpdater(first_datum, parameters.local_ecef)
 
   initial_sats = mgmt.get_sats_management()[1]
@@ -140,10 +147,20 @@ def main():
   import argparse
   parser = argparse.ArgumentParser(description='RTK Filter SITL tests.')
   parser.add_argument('file', help='Specify the HDF5 file to use.')
+  parser.add_argument('baselineX', help='The baseline north component.')
+  parser.add_argument('baselineY', help='The baseline east  component.')
+  parser.add_argument('baselineZ', help='The baseline down component.')
+  parser.add_argument('--NED', action='store_true')
   args = parser.parse_args()
   hdf5_filename = args.file
+  baselineX = args.baselineX
+  baselineY = args.baselineY
+  baselineZ = args.baselineZ
+  args.NED
 
-  reports = run(hdf5_filename)
+  baseline = np.array(map(float,[baselineX, baselineY, baselineZ]))
+
+  reports = run(hdf5_filename, baseline, baseline_is_NED=args.NED)
   for key, report in reports.iteritems():
     print '(key=' + key + ') \t' + str(report)
 

@@ -241,7 +241,7 @@ def mk_sdiffs_and_abs_pos(ephs, local, remote):
       sd = df[sat]
 
       sat_pos, sat_vel, clock_err, clock_rate_err =  \
-        calc_sat_pos(construct_pyobj_eph(eph_t[sat]), gpst)
+        calc_sat_state(construct_pyobj_eph(eph_t[sat]), gpst)
       sat_poss[sat] = sat_pos
       sat_vels[sat] = sat_vel
       clock_errs[sat] = clock_err
