@@ -41,9 +41,6 @@ def main():
   if row is None:
     row = hdf5_filename_in
 
-  # out_key = hdf5_filename_in.split('/')[-1].split('.')[0]
-  # print 'hdf5_filename_in = ' + str(hdf5_filename_in)
-  # print 'OUT_KEY = ' + out_key
   reports = single_run(hdf5_filename_in, baseline, baseline_is_NED=args.NED)
 
   out_store = pd.HDFStore(hdf5_filename_out)
