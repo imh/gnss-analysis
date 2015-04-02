@@ -105,10 +105,10 @@ class DGNSSParameters(object):
       self.known_baseline = known_baseline
 
 reports = [ CountR()
-          # , FixedIARBegunR()
-          # , FixedIARCompletedR()
-          # , FixedIARLeastSquareStartedInPoolR()
-          # , FixedIARLeastSquareEndedInPoolR()
+          , FixedIARBegunR()
+          , FixedIARCompletedR()
+          , FixedIARLeastSquareStartedInPoolR()
+          , FixedIARLeastSquareEndedInPoolR()
           # , FloatBaselineR()
           # , FixedBaselineR()
           # , KFSatsR()
