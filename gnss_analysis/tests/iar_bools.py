@@ -44,6 +44,9 @@ import numpy as np
 #     ils_fixed = ILS for amb_test's sats
 #     if final IAR solution matches ils_fixed, fold True to 'correct ILS found'
 
+def amb_test_going():
+  return mgmt.dgnss_iar_num_sats() > 0 and mgmt.dgnss_iar_num_hyps() > 0
+
 class FixedIARBegun(Analysis):
   """
   Keeps track of whether the fixed IAR process has begun yet in this dataset.
@@ -57,7 +60,7 @@ class FixedIARBegun(Analysis):
   def compute(self, data, current_analyses, prev_fold, parameters):
     if prev_fold['FixedIARBegun']:
       return True
-    return iar_going()
+    return amb_test_going()
 
 class FixedIARCompleted(Analysis):
   """
