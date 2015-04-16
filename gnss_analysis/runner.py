@@ -105,19 +105,19 @@ class DGNSSParameters(object):
       self.known_baseline = known_baseline
 
 reports = [ CountR()
-          , FixedIARBegunR()
-          , FixedIARCompletedR()
-          , FixedIARLeastSquareStartedInPoolR()
-          , FixedIARLeastSquareEndedInPoolR()
-          # , FloatBaselineR()
-          # , FixedBaselineR()
-          , FixedILSVectorR()
-          , FloatILSVectorR()
-          , FixedILSVectorLLR()
-          , FloatILSVectorChisqR()
-          , KFSatsR()
-          # , KFMeanR()
-          # , KFCovR()
+       #   , FixedIARBegunR()
+       #   , FixedIARCompletedR()
+       #   , FixedIARLeastSquareStartedInPoolR()
+       #   , FixedIARLeastSquareEndedInPoolR()
+       #   # , FloatBaselineR()
+       #   # , FixedBaselineR()
+       #   , FixedILSVectorR()
+       #   , FloatILSVectorR()
+       #   , FixedILSVectorLLR()
+       #   , FloatILSVectorChisqR()
+       #   , KFSatsR()
+       #   # , KFMeanR()
+       #   # , KFCovR()
           ]
 
 def run(hdf5_filename, known_baseline, reports=reports, baseline_is_NED=False):

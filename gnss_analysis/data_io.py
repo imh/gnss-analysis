@@ -331,7 +331,7 @@ def compute_ecef(pseudoranges, dops, sat_poss, sat_vels, t):
     # instead of using either the corrected/raw for both corrected and raw.
     nms.append(NavigationMeasurement(pseudorange, pseudorange,
         np.nan, dop, dop, sat_pos, sat_vel, np.nan, np.nan, gpst.tow, gpst.wn, sat))
-  return calc_PVT(nms).pos_ecef
+  return calc_PVT(nms)[1].pos_ecef
 
 def load_sdiffs_and_pos(data_filename,
                         key_eph='ephemerises', key_local='local', key_remote='remote',
