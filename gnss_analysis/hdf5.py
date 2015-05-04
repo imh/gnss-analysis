@@ -26,8 +26,12 @@ import sbp.observation as ob
 import sbp.tracking as tr
 import swiftnav.gpstime as gpstime
 
+# Units conversations (length, time, and 8-bit fractional cycles)
 MAX_SATS = 32
 MSEC_TO_SECONDS = 1000.
+MM_TO_M = 1000.
+CM_TO_M = 100.
+Q32_WIDTH = 256.
 from_base = lambda msg: msg.sender == 0
 time_fn = gpstime.gpst_components2datetime
 
@@ -38,8 +42,8 @@ class StoreToHDF5(object):
   """
 
   def __init__(self):
-    self.base = {}
-    self.rover = {}
+    self.base_obs = {}
+    self.rover_obs = {}
     self.ephemerides = {}
     self.rover_spp = {}
     self.rover_rtk = {}
@@ -48,10 +52,10 @@ class StoreToHDF5(object):
   def _process_obs(self, msg):
     if type(msg) is ob.MsgObs:
       time = time_fn(msg.header.t.wn, msg.header.t.tow / MSEC_TO_SECONDS)
-      t = self.base if from_base(msg) else self.rover
+      t = self.base_obs if from_base(msg) else self.rover_obs
       # Convert pseudorange, carrier phase to SI units.
       for o in msg.obs:
-        v = {'P': o.P / 100., 'L': o.L.i + o.L.f / 256.,
+        v = {'P': o.P / CM_TO_M, 'L': o.L.i + o.L.f / Q32_WIDTH,
              'cn0': o.cn0, 'lock': o.lock}
         if time in t:
           t[time].update({o.prn: v})
@@ -80,9 +84,9 @@ class StoreToHDF5(object):
       elif type(msg) is nav.MsgBaselineNED:
         time = time_fn(self.time.wn, msg.tow / MSEC_TO_SECONDS)
         m['tow'] /= MSEC_TO_SECONDS
-        m['n'] /= 1000.
-        m['e'] /= 1000.
-        m['d'] /= 1000.
+        m['n'] /= MM_TO_M
+        m['e'] /= MM_TO_M
+        m['d'] /= MM_TO_M
         self.rover_rtk[time] = m
 
   def process_message(self, msg):
@@ -95,8 +99,8 @@ class StoreToHDF5(object):
       print "Unlinking %s, which already exists!" % filename
       os.unlink(filename)
     f = pd.HDFStore(filename, mode='w')
-    f.put('base', pd.Panel(self.base))
-    f.put('rover', pd.Panel(self.rover))
+    f.put('base_obs', pd.Panel(self.base_obs))
+    f.put('rover_obs', pd.Panel(self.rover_obs))
     f.put('ephemerides', pd.Panel(self.ephemerides))
     f.put('rover_spp', pd.DataFrame(self.rover_spp))
     f.put('rover_rtk', pd.DataFrame(self.rover_rtk))
@@ -108,6 +112,7 @@ def main():
 
   """
   import argparse
+  import time
   parser = argparse.ArgumentParser(description='Swift Nav SBP log parser.')
   parser.add_argument('file',
                       help='Specify the log file to use.')
@@ -124,9 +129,14 @@ def main():
   num_records = args.num_records[0]
   processor = StoreToHDF5()
   i = 0
+  logging_interval = 10000
+  start = time.time()
   with JSONLogIterator(log_datafile) as log:
     for delta, timestamp, msg in log.next():
       i += 1
+      if i % logging_interval == 0:
+        print "Processed %d records! @ %s sec." \
+          % (i, time.time() - start)
       processor.process_message(msg)
       if num_records is not None and i >= int(num_records):
         print "Processed %d records!" % i
