@@ -2,16 +2,16 @@
 # -*- coding: utf-8 -*-
 
 try:
-    import sys
-    reload(sys).setdefaultencoding("UTF-8")
+  import sys
+  reload(sys).setdefaultencoding("UTF-8")
 except:
-    pass
+  pass
 
 try:
-    from setuptools import setup, find_packages
+  from setuptools import setup, find_packages
 except ImportError:
-    print 'Please install or upgrade setuptools or pip to continue.'
-    sys.exit(1)
+  print 'Please install or upgrade setuptools or pip to continue.'
+  sys.exit(1)
 
 setup(name='gnss_analysis',
       description='Software-in-the-loop testing for libswiftnav RTK filters',

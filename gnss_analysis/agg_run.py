@@ -13,6 +13,7 @@ from gnss_analysis.runner import run as single_run
 import pandas as pd
 import numpy as np
 
+
 def main():
   import argparse
   parser = argparse.ArgumentParser(description='RTK Filter SITL tests.')
@@ -35,7 +36,7 @@ def main():
   baselineX = args.baselineX
   baselineY = args.baselineY
   baselineZ = args.baselineZ
-  baseline = np.array(map(float,[baselineX, baselineY, baselineZ]))
+  baseline = np.array(map(float, [baselineX, baselineY, baselineZ]))
   out_key = args.key
   row = args.row
   if row is None:
@@ -51,7 +52,8 @@ def main():
 
   new_cols = [col for col in reports.keys() if col not in out_df.columns]
   for new_col in new_cols:
-    out_df[new_col] = pd.Series([np.nan]*len(out_df.index), index=out_df.index)
+    out_df[new_col] = pd.Series(np.nan * np.empty_like(out_df.index),
+                                index=out_df.index)
   out_df.loc[row] = pd.Series(reports)
 
   out_store[out_key] = out_df
