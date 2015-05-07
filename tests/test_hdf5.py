@@ -90,8 +90,10 @@ def test_hdf5():
                'P': 19864244.440000001,
                'cn0': 50.0,
                'lock': 42862.0}}
-    assert isinstance(store.rover_rtk, pd.DataFrame)
-    assert store.rover_rtk.shape == (0, 0)
+    assert isinstance(store.rover_rtk_ned, pd.DataFrame)
+    assert store.rover_rtk_ned.shape == (0, 0)
+    assert isinstance(store.rover_rtk_ecef, pd.DataFrame)
+    assert store.rover_rtk_ecef.shape == (0, 0)
     assert isinstance(store.rover_spp, pd.DataFrame)
     assert store.rover_spp.shape == (7, 5)
     assert store.rover_spp[2:5].to_dict() \

@@ -46,7 +46,8 @@ class StoreToHDF5(object):
     self.rover_obs = {}
     self.ephemerides = {}
     self.rover_spp = {}
-    self.rover_rtk = {}
+    self.rover_rtk_ned = {}
+    self.rover_rtk_ecef = {}
     self.time = None
 
   def _process_obs(self, msg):
@@ -87,7 +88,14 @@ class StoreToHDF5(object):
         m['n'] /= MM_TO_M
         m['e'] /= MM_TO_M
         m['d'] /= MM_TO_M
-        self.rover_rtk[time] = m
+        self.rover_rtk_ned[time] = m
+      elif type(msg) is nav.MsgBaselineECEF:
+        time = time_fn(self.time.wn, msg.tow / MSEC_TO_SECONDS)
+        m['tow'] /= MSEC_TO_SECONDS
+        m['x'] /= MM_TO_M
+        m['y'] /= MM_TO_M
+        m['z'] /= MM_TO_M
+        self.rover_rtk_ecef[time] = m
 
   def process_message(self, msg):
     self._process_pos(msg)
@@ -103,7 +111,8 @@ class StoreToHDF5(object):
     f.put('rover_obs', pd.Panel(self.rover_obs))
     f.put('ephemerides', pd.Panel(self.ephemerides))
     f.put('rover_spp', pd.DataFrame(self.rover_spp))
-    f.put('rover_rtk', pd.DataFrame(self.rover_rtk))
+    f.put('rover_rtk_ned', pd.DataFrame(self.rover_rtk_ned))
+    f.put('rover_rtk_ecef', pd.DataFrame(self.rover_rtk_ecef))
     f.close()
 
 
