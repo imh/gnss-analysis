@@ -42,66 +42,78 @@ import swiftnav.dgnss_management as mgmt
 #     ils_fixed = ILS for amb_test's sats
 #     if final IAR solution matches ils_fixed, fold True to 'correct ILS found'
 
+
 class FixedIARBegun(Analysis):
+  """Keeps track of whether the fixed IAR process has begun yet in this
+  dataset.  (Fixed as opposed to float IAR.)
+
   """
-  Keeps track of whether the fixed IAR process has begun yet in this dataset.
-  (Fixed as opposed to float IAR.)
-  """
+
   def __init__(self):
-    super(FixedIARBegun, self).__init__(
-      key='FixedIARBegun',
-      keep_as_fold=True,
-      fold_init=False)
+    super(FixedIARBegun, self).__init__(key='FixedIARBegun',
+                                        keep_as_fold=True,
+                                        fold_init=False)
+
   def compute(self, data, current_analyses, prev_fold, parameters):
     if prev_fold['FixedIARBegun']:
       return True
     return mgmt.dgnss_iar_num_sats() > 0 and mgmt.dgnss_iar_num_hyps() > 0
 
+
 class FixedIARCompleted(Analysis):
+  """Keeps track of whether the fixed IAR process has completed yet in
+  this dataset. (Fixed as opposed to float IAR.)
+
   """
-  Keeps track of whether the fixed IAR process has completed yet in this
-  dataset. (Fixed as opposed to float IAR.)
-  """
+
   def __init__(self):
-    super(FixedIARCompleted, self).__init__(
-      key='FixedIARCompleted',
-      parents=set([FixedIARBegun()]),
-      keep_as_fold=True,
-      fold_init=False)
+    super(FixedIARCompleted, self).__init__(key='FixedIARCompleted',
+                                            parents=set([FixedIARBegun()]),
+                                            keep_as_fold=True,
+                                            fold_init=False)
+
   def compute(self, data, current_analyses, prev_fold, parameters):
     if prev_fold['FixedIARCompleted']:
       return True
     return current_analyses['FixedIARBegun'] and mgmt.dgnss_iar_resolved()
 
+
 class FixedIARLeastSquareInPool(Analysis):
+  """
+  """
+
   def __init__(self):
-    super(FixedIARLeastSquareInPool, self).__init__(
-      key='FixedIARLeastSquareInPool',
-      parents=set([FixedIARBegun()]),
-      keep_as_map=True)
+    super(FixedIARLeastSquareInPool, self).__init__(key='FixedIARLeastSquareInPool',
+                                                    parents=set([FixedIARBegun()]),
+                                                    keep_as_map=True)
+
   def compute(self, data, current_analyses, prev_fold, parameters):
     if current_analyses['FixedIARBegun'] and mgmt.dgnss_iar_num_sats() >= 4:
       dat = data.apply(ut.mk_swiftnav_sdiff, axis=0).dropna()
       iar_de, iar_phase = mgmt.get_iar_de_and_phase(
-        dat, parameters.local_ecef + 0.5 * parameters.known_baseline)
+        dat, parameters.rover_ecef + 0.5 * parameters.known_baseline)
       ia_vec_from_b = ut.get_N_from_b(iar_phase,
                                       iar_de,
                                       parameters.known_baseline)
       return mgmt.dgnss_iar_pool_contains(ia_vec_from_b)
     return None
 
+
 class FixedIARLeastSquareStartedInPool(Analysis):
+  """
+  """
+
   def __init__(self):
-    super(FixedIARLeastSquareStartedInPool, self).__init__(
-      key='FixedIARLeastSquareStartedInPool',
-      parents=set([FixedIARBegun()]),
-      keep_as_fold=True,
-      fold_init=False)
+    super(FixedIARLeastSquareStartedInPool, self).__init__(key='FixedIARLeastSquareStartedInPool',
+                                                           parents=set([FixedIARBegun()]),
+                                                           keep_as_fold=True,
+                                                           fold_init=False)
+
   def compute(self, data, current_analyses, prev_fold, parameters):
     if current_analyses['FixedIARBegun'] and not prev_fold['FixedIARBegun']:
       dat = data.apply(ut.mk_swiftnav_sdiff, axis=0).dropna()
       iar_de, iar_phase = mgmt.get_iar_de_and_phase(
-        dat, parameters.local_ecef + 0.5 * parameters.known_baseline)
+        dat, parameters.rover_ecef + 0.5 * parameters.known_baseline)
       ia_vec_from_b = ut.get_N_from_b(iar_phase,
                                       iar_de,
                                       parameters.known_baseline)
@@ -109,18 +121,22 @@ class FixedIARLeastSquareStartedInPool(Analysis):
       # return current_analyses['FixedIARLeastSquareInPool']
     return prev_fold['FixedIARLeastSquareStartedInPool']
 
+
 class FixedIARLeastSquareEndedInPool(Analysis):
+  """
+  """
+
   def __init__(self):
-    super(FixedIARLeastSquareEndedInPool, self).__init__(
-      key='FixedIARLeastSquareEndedInPool',
-      parents=set([FixedIARCompleted()]),
-      keep_as_fold=True,
-      fold_init=False)
+    super(FixedIARLeastSquareEndedInPool, self).__init__(key='FixedIARLeastSquareEndedInPool',
+                                                         parents=set([FixedIARCompleted()]),
+                                                         keep_as_fold=True,
+                                                         fold_init=False)
+
   def compute(self, data, current_analyses, prev_fold, parameters):
     if current_analyses['FixedIARCompleted'] and not prev_fold['FixedIARCompleted']:
       dat = data.apply(ut.mk_swiftnav_sdiff, axis=0).dropna()
       iar_de, iar_phase = mgmt.get_iar_de_and_phase(
-        dat, parameters.local_ecef + 0.5 * parameters.known_baseline)
+        dat, parameters.rover_ecef + 0.5 * parameters.known_baseline)
       ia_vec_from_b = ut.get_N_from_b(iar_phase,
                                       iar_de,
                                       parameters.known_baseline)
@@ -128,46 +144,57 @@ class FixedIARLeastSquareEndedInPool(Analysis):
       # return current_analyses['FixedIARLeastSquareInPool']
     return prev_fold['FixedIARLeastSquareEndedInPool']
 
+
 class FixedIARBegunR(Report):
   """
   Reports whether the fixed IAR process (hypothesis pool) ever started in this
   dataset.
   """
+
   def __init__(self):
-    super(FixedIARBegunR, self).__init__(
-      key='FixedIARBegun',
-      parents=set([FixedIARBegun()]),
-      dist_type=ms.DistType.BINOMIAL)
+    super(FixedIARBegunR, self).__init__(key='FixedIARBegun',
+                                         parents=set([FixedIARBegun()]),
+                                         dist_type=ms.DistType.BINOMIAL)
+
   def report(self, data, analyses, folds, parameters):
     return folds['FixedIARBegun']
+
 
 class FixedIARCompletedR(Report):
   """
   Reports whether the fixed IAR process (hypothesis pool) ever completed in
   this dataset.
   """
+
   def __init__(self):
-    super(FixedIARCompletedR, self).__init__(
-      key='FixedIARCompleted',
-      parents=set([FixedIARCompleted()]),
-      dist_type=ms.DistType.BINOMIAL)
+    super(FixedIARCompletedR, self).__init__(key='FixedIARCompleted',
+                                             parents=set([FixedIARCompleted()]),
+                                             dist_type=ms.DistType.BINOMIAL)
+
   def report(self, data, analyses, folds, parameters):
     return folds['FixedIARCompleted']
 
+
 class FixedIARLeastSquareStartedInPoolR(Report):
+  """
+  """
+
   def __init__(self):
-    super(FixedIARLeastSquareStartedInPoolR, self).__init__(
-      key='FixedIARLeastSquareStartedInPool',
-      parents=set([FixedIARLeastSquareStartedInPool()]),
-      dist_type=ms.DistType.BINOMIAL)
+    super(FixedIARLeastSquareStartedInPoolR, self).__init__(key='FixedIARLeastSquareStartedInPool',
+                                                            parents=set([FixedIARLeastSquareStartedInPool()]),
+                                                            dist_type=ms.DistType.BINOMIAL)
+
   def report(self, data, analyses, folds, parameters):
     return folds['FixedIARLeastSquareStartedInPool']
 
 class FixedIARLeastSquareEndedInPoolR(Report):
+  """
+  """
+
   def __init__(self):
-    super(FixedIARLeastSquareEndedInPoolR, self).__init__(
-      key='FixedIARLeastSquareEndedInPool',
-      parents=set([FixedIARLeastSquareEndedInPool()]),
-      dist_type=ms.DistType.BINOMIAL)
+    super(FixedIARLeastSquareEndedInPoolR, self).__init__(key='FixedIARLeastSquareEndedInPool',
+                                                          parents=set([FixedIARLeastSquareEndedInPool()]),
+                                                          dist_type=ms.DistType.BINOMIAL)
+
   def report(self, data, analyses, folds, parameters):
     return folds['FixedIARLeastSquareEndedInPool']

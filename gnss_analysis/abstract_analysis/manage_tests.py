@@ -11,7 +11,7 @@
 
 import pandas as pd
 
-class SITL:
+class SITL(object):
   def __init__(self, update_function, data, parameters=None):
     self.analyses = dict()
     self.non_summary_analyses = []
@@ -116,7 +116,7 @@ def fold_inits(non_summary_analyses):
   return folds
 
 def nodes_without_incoming_edges(nodes, edges):
-  #NOTE can't just go through the edge list because some nodes have no edges
+  # NOTE can't just go through the edge list because some nodes have no edges
   return [node for node in nodes if not has_incoming_edges(edges, node)]
 
 def has_incoming_edges(edges, node):
@@ -127,4 +127,3 @@ def has_incoming_edges(edges, node):
 
 def is_empty(has_len):
   return len(has_len) == 0
-
