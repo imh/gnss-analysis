@@ -19,14 +19,14 @@ class FloatBaselineA(Analysis):
   """
   The current float baseline
   """
+
   def __init__(self):
-    super(FloatBaselineA, self).__init__(key='FloatBaseline',
-                                         keep_as_map=True)
+    k = 'FloatBaseline'
+    super(FloatBaselineA, self).__init__(key=k, keep_as_map=True)
 
   def compute(self, data, current_analyses, prev_fold, parameters):
-    num_used, b \
-      = mgmt.dgnss_new_float_baseline(data.apply(ut.mk_swiftnav_sdiff, axis=0).dropna(),
-                                      parameters.rover_ecef)
+    d = data.apply(ut.mk_swiftnav_sdiff, axis=0).dropna(),
+    num_used, b = mgmt.dgnss_new_float_baseline(d, parameters.rover_ecef)
     return b
 
 
@@ -34,8 +34,10 @@ class FloatBaselineR(Report):
   """
   A timeseries of the float baselines.
   """
+
   def __init__(self):
-    super(FloatBaselineR, self).__init__(key="FloatBaseline",
+    k = "FloatBaseline"
+    super(FloatBaselineR, self).__init__(key=k,
                                          parents=set([FloatBaselineA()]))
 
   def report(self, data, analyses, folds, parameters):
@@ -46,14 +48,14 @@ class FixedBaselineA(Analysis):
   """
   The current fixed baseline, if we can make it, otherwise [nan, nan, nan]
   """
+
   def __init__(self):
-    super(FixedBaselineA, self).__init__(key='FixedBaseline',
-                                         keep_as_map=True)
+    k = 'FixedBaseline'
+    super(FixedBaselineA, self).__init__(key=k, keep_as_map=True)
 
   def compute(self, data, current_analyses, prev_fold, parameters):
-    num_used, b \
-      = mgmt.dgnss_fixed_baseline(data.apply(ut.mk_swiftnav_sdiff, axis=0).dropna(),
-                                  parameters.rover_ecef)
+    d = data.apply(ut.mk_swiftnav_sdiff, axis=0).dropna()
+    num_used, b = mgmt.dgnss_fixed_baseline(d, parameters.rover_ecef)
     return b
 
 
@@ -61,8 +63,10 @@ class FixedBaselineR(Report):
   """
   A timeseries of the float baselines.
   """
+
   def __init__(self):
-    super(FixedBaselineR, self).__init__(key="FixedBaseline",
+    k = "FixedBaseline",
+    super(FixedBaselineR, self).__init__(key=k,
                                          parents=set([FixedBaselineA()]))
 
   def report(self, data, analyses, folds, parameters):
