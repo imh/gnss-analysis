@@ -25,7 +25,7 @@ class FloatBaselineA(Analysis):
     super(FloatBaselineA, self).__init__(key=k, keep_as_map=True)
 
   def compute(self, data, current_analyses, prev_fold, parameters):
-    d = data.apply(ut.mk_swiftnav_sdiff, axis=0).dropna(),
+    d = data.apply(ut.mk_swiftnav_sdiff, axis=0).dropna()
     num_used, b = mgmt.dgnss_new_float_baseline(d, parameters.rover_ecef)
     return b
 
@@ -65,7 +65,7 @@ class FixedBaselineR(Report):
   """
 
   def __init__(self):
-    k = "FixedBaseline",
+    k = "FixedBaseline"
     super(FixedBaselineR, self).__init__(key=k,
                                          parents=set([FixedBaselineA()]))
 
