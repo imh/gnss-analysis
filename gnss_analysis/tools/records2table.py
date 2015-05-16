@@ -38,6 +38,7 @@ import sbp.navigation as nav
 import sbp.observation as ob
 import sbp.piksi as piksi
 import sbp.tracking as tr
+import sbp.logging as lg
 import swiftnav.gpstime as gpstime
 
 from_base = lambda msg: msg.sender == 0
@@ -132,12 +133,19 @@ class StoreToHDF5(object):
       m['host_time'] = host_time
       self.rover_iar_state[host_offset] = m
 
+  def _process_print(self, msg, hosttime):
+    if type(msg) is lg.MsgPrint:
+      m = {'hosttime': hosttime, 'text': msg.text}
+      print hosttime, msg.text
+      self.rover_msgs.append(m)
+
   def process_message(self, host_offset, host_time, msg):
     self._process_pos(host_offset, host_time, msg)
     self._process_eph(host_offset, host_time, msg)
     self._process_obs(host_offset, host_time, msg)
     self._process_tracking(host_offset, host_time, msg)
     self._process_iar(host_offset, host_time, msg)
+    self._process_print(host_offset, host_time, msg)
 
   def save(self, filename):
     if os.path.exists(filename):
@@ -152,6 +160,7 @@ class StoreToHDF5(object):
     f.put('rover_rtk_ecef', pd.DataFrame(self.rover_rtk_ecef))
     f.put('rover_tracking', pd.Panel(self.rover_tracking))
     f.put('rover_iar_state', pd.DataFrame(self.rover_iar_state))
+    f.put('rover_msgs', pd.DataFrame(self.rover_msgs))
     f.close()
 
 
@@ -186,7 +195,7 @@ def main():
     for delta, timestamp, msg in log.next():
       i += 1
       if i % logging_interval == 0:
-        print "Processed %d records! @ %s sec." \
+        print "Processed %d records! @ %.1f sec." \
           % (i, time.time() - start)
       processor.process_message(delta, timestamp, msg)
       if num_records is not None and i >= int(num_records):
