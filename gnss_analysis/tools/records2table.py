@@ -11,12 +11,25 @@
 # WARRANTIES OF MERCHANTABILITY AND/OR FITNESS FOR A PARTICULAR PURPOSE.
 
 """Generates an Pandas-compatible, HDF5 file of GPS observations,
-ephemerides, and estimated baseline and single point solutions from a
-HITL testing log. Indexed by GPS time with observable quantities, like
-pseudorange and carrier phase, converted to SI units.
+ephemerides, and reported baseline and single point solutions from a
+HITL testing log. These quantities are indexed by GPS time with
+observable quantities, like pseudorange and carrier phase, converted
+to SI units. Hopefully you should only need to do this once.
+
+The output of this process is a Pandas Panel that looks a bit like the
+following:
+<class 'pandas.io.pytables.HDFStore'>
+File path: data/serial-link-20150506-175750.log.json.new_fields.hdf5
+/base_obs                  wide         (shape->[7272,4,8])
+/ephemerides               wide         (shape->[2,26,8])
+/rover_obs                 wide         (shape->[7241,4,8])
+/rover_rtk_ecef            frame        (shape->[7,14545])
+/rover_rtk_ned             frame        (shape->[8,14545])
+/rover_spp                 frame        (shape->[7237,3])
 
 """
 
+from gnss_analysis.constants import *
 from sbp.client.loggers.json_logger import JSONLogIterator
 from sbp.utils import exclude_fields
 import os
@@ -26,14 +39,11 @@ import sbp.observation as ob
 import sbp.tracking as tr
 import swiftnav.gpstime as gpstime
 
-# Units conversations (length, time, and 8-bit fractional cycles)
-MAX_SATS = 32
-MSEC_TO_SECONDS = 1000.
-MM_TO_M = 1000.
-CM_TO_M = 100.
-Q32_WIDTH = 256.
 from_base = lambda msg: msg.sender == 0
 time_fn = gpstime.gpst_components2datetime
+
+# TODO (Buro): The Pandas HDF5 stuff can handle hierarchical keys,
+# which we should probably consider using throughout this project.
 
 
 class StoreToHDF5(object):
@@ -122,7 +132,7 @@ def main():
   """
   import argparse
   import time
-  parser = argparse.ArgumentParser(description='Swift Nav SBP log parser.')
+  parser = argparse.ArgumentParser(description='Swift Nav SBP log to HDF5 table tool.')
   parser.add_argument('file',
                       help='Specify the log file to use.')
   parser.add_argument('-o', '--output',
