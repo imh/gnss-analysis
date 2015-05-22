@@ -9,10 +9,10 @@
 # EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE IMPLIED
 # WARRANTIES OF MERCHANTABILITY AND/OR FITNESS FOR A PARTICULAR PURPOSE.
 
-from sbp.client.loggers.json_logger import JSONLogIterator
-from gnss_analysis.hdf5 import StoreToHDF5
+from gnss_analysis.tools.records2table import StoreToHDF5
 from numpy import nan
 from pandas.tslib import Timestamp
+from sbp.client.loggers.json_logger import JSONLogIterator
 import os
 import pandas as pd
 import pytest
