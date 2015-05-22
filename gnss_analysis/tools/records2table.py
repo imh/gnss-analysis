@@ -143,8 +143,11 @@ def main():
                       default=[None],
                       help='Number or SBP records to process.')
   args = parser.parse_args()
-  filename = args.output[0]
   log_datafile = args.file
+  if args.output is None:
+    filename = log_datafile + '.hdf5'
+  else:
+    filename = args.output[0]
   num_records = args.num_records[0]
   processor = StoreToHDF5()
   i = 0
