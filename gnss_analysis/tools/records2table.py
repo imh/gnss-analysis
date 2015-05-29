@@ -31,11 +31,12 @@ File path: data/serial-link-20150506-175750.log.json.new_fields.hdf5
 
 from gnss_analysis.constants import *
 from sbp.client.loggers.json_logger import JSONLogIterator
-from sbp.utils import exclude_fields
+from sbp.utils import exclude_fields, walk_json_dict
 import os
 import pandas as pd
 import sbp.navigation as nav
 import sbp.observation as ob
+import sbp.piksi as piksi
 import sbp.tracking as tr
 import swiftnav.gpstime as gpstime
 
@@ -58,9 +59,11 @@ class StoreToHDF5(object):
     self.rover_spp = {}
     self.rover_rtk_ned = {}
     self.rover_rtk_ecef = {}
+    self.rover_tracking = {}
+    self.rover_iar_state = {}
     self.time = None
 
-  def _process_obs(self, msg):
+  def _process_obs(self, host_offset, host_time, msg):
     if type(msg) is ob.MsgObs:
       time = time_fn(msg.header.t.wn, msg.header.t.tow / MSEC_TO_SECONDS)
       t = self.base_obs if from_base(msg) else self.rover_obs
@@ -68,26 +71,29 @@ class StoreToHDF5(object):
       for o in msg.obs:
         v = {'P': o.P / CM_TO_M, 'L': o.L.i + o.L.f / Q32_WIDTH,
              'cn0': o.cn0, 'lock': o.lock}
+        v.update({'host_offset': host_offset, 'host_time': host_time})
         if time in t:
           t[time].update({o.prn: v})
         else:
           t[time] = {o.prn: v}
 
-  def _process_eph(self, msg):
+  def _process_eph(self, host_offset, host_time, msg):
     if type(msg) is ob.MsgEphemeris or type(msg) is tr.MsgEphemerisOld:
       if msg.healthy == 1 and msg.valid == 1:
         time = gpstime.gpst_components2datetime(msg.toe_wn, msg.toe_tow)
         m = exclude_fields(msg)
+        m.update({'host_offset': host_offset, 'host_time': host_time})
         if time in self.ephemerides:
           self.ephemerides[time].update({msg.prn: m})
         else:
           self.ephemerides[time] = {msg.prn: m}
 
-  def _process_pos(self, msg):
+  def _process_pos(self, host_offset, host_time, msg):
     if type(msg) is nav.MsgGPSTime:
       self.time = msg
     elif self.time is not None:
       m = exclude_fields(msg)
+      m.update({'host_offset': host_offset, 'host_time': host_time})
       if type(msg) is nav.MsgPosECEF:
         time = time_fn(self.time.wn, msg.tow / MSEC_TO_SECONDS)
         m['tow'] /= MSEC_TO_SECONDS
@@ -107,10 +113,31 @@ class StoreToHDF5(object):
         m['z'] /= MM_TO_M
         self.rover_rtk_ecef[time] = m
 
-  def process_message(self, msg):
-    self._process_pos(msg)
-    self._process_eph(msg)
-    self._process_obs(msg)
+  def _process_tracking(self, host_offset, host_time, msg):
+    if type(msg) is tr.MsgTrackingState:
+      m = exclude_fields(msg)
+      # Flatten a bit: reindex at the top level by prn and remove the
+      # 'states' field from the message.
+      for s in msg.states:
+        m[s.prn] = walk_json_dict(s)
+        m[s.prn].update({'host_offset': host_offset,
+                         'host_time': host_time})
+      self.rover_tracking[host_offset] = m
+      del m['states']
+
+  def _process_iar(self, host_offset, host_time, msg):
+    if type(msg) is piksi.MsgIarState:
+      m = exclude_fields(msg)
+      m['host_offset'] = host_offset
+      m['host_time'] = host_time
+      self.rover_iar_state[host_offset] = m
+
+  def process_message(self, host_offset, host_time, msg):
+    self._process_pos(host_offset, host_time, msg)
+    self._process_eph(host_offset, host_time, msg)
+    self._process_obs(host_offset, host_time, msg)
+    self._process_tracking(host_offset, host_time, msg)
+    self._process_iar(host_offset, host_time, msg)
 
   def save(self, filename):
     if os.path.exists(filename):
@@ -123,6 +150,8 @@ class StoreToHDF5(object):
     f.put('rover_spp', pd.DataFrame(self.rover_spp))
     f.put('rover_rtk_ned', pd.DataFrame(self.rover_rtk_ned))
     f.put('rover_rtk_ecef', pd.DataFrame(self.rover_rtk_ecef))
+    f.put('rover_tracking', pd.Panel(self.rover_tracking))
+    f.put('rover_iar_state', pd.DataFrame(self.rover_iar_state))
     f.close()
 
 
@@ -159,7 +188,7 @@ def main():
       if i % logging_interval == 0:
         print "Processed %d records! @ %s sec." \
           % (i, time.time() - start)
-      processor.process_message(msg)
+      processor.process_message(delta, timestamp, msg)
       if num_records is not None and i >= int(num_records):
         print "Processed %d records!" % i
         break
