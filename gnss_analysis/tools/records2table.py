@@ -14,18 +14,25 @@
 ephemerides, and reported baseline and single point solutions from a
 HITL testing log. These quantities are indexed by GPS time with
 observable quantities, like pseudorange and carrier phase, converted
-to SI units. Hopefully you should only need to do this once.
+to SI units. It will also include the UTC host time the message was
+received on the serial host.
+
+Hopefully you should only need to do this once for a given HITL JSON
+file.
 
 The output of this process is a Pandas Panel that looks a bit like the
 following:
 <class 'pandas.io.pytables.HDFStore'>
-File path: data/serial-link-20150506-175750.log.json.new_fields.hdf5
-/base_obs                  wide         (shape->[7272,4,8])
-/ephemerides               wide         (shape->[2,26,8])
-/rover_obs                 wide         (shape->[7241,4,8])
-/rover_rtk_ecef            frame        (shape->[7,14545])
-/rover_rtk_ned             frame        (shape->[8,14545])
-/rover_spp                 frame        (shape->[7237,3])
+File path: data/serial-link-20150506-175750.log.json.fake.hdf5
+/base_obs                   wide         (shape->[6948,6,9])
+/ephemerides                wide         (shape->[1,28,10])
+/rover_iar_state            frame        (shape->[3,1487])
+/rover_logs                 frame        (shape->[1,3907])
+/rover_obs                  wide         (shape->[6954,6,10])
+/rover_rtk_ecef             frame        (shape->[9,14112])
+/rover_rtk_ned              frame        (shape->[10,14112])
+/rover_spp                  frame        (shape->[9,14116])
+/rover_tracking             wide         (shape->[7370,5,32])
 
 """
 
@@ -38,6 +45,7 @@ import sbp.navigation as nav
 import sbp.observation as ob
 import sbp.piksi as piksi
 import sbp.tracking as tr
+import sbp.logging as lg
 import swiftnav.gpstime as gpstime
 
 from_base = lambda msg: msg.sender == 0
@@ -46,6 +54,8 @@ time_fn = gpstime.gpst_components2datetime
 # TODO (Buro): The Pandas HDF5 stuff can handle hierarchical keys,
 # which we should probably consider using throughout this project.
 
+import warnings
+warnings.filterwarnings('ignore', category=pd.io.pytables.PerformanceWarning)
 
 class StoreToHDF5(object):
   """Stores observations as HDF5.
@@ -61,6 +71,7 @@ class StoreToHDF5(object):
     self.rover_rtk_ecef = {}
     self.rover_tracking = {}
     self.rover_iar_state = {}
+    self.rover_logs = {}
     self.time = None
 
   def _process_obs(self, host_offset, host_time, msg):
@@ -122,8 +133,8 @@ class StoreToHDF5(object):
         m[s.prn] = walk_json_dict(s)
         m[s.prn].update({'host_offset': host_offset,
                          'host_time': host_time})
-      self.rover_tracking[host_offset] = m
       del m['states']
+      self.rover_tracking[host_offset] = m
 
   def _process_iar(self, host_offset, host_time, msg):
     if type(msg) is piksi.MsgIarState:
@@ -132,12 +143,33 @@ class StoreToHDF5(object):
       m['host_time'] = host_time
       self.rover_iar_state[host_offset] = m
 
+  def _process_log(self, host_offset, host_time, msg):
+    if type(msg) is lg.MsgPrint:
+      m = exclude_fields(msg)
+      m['host_offset'] = host_offset
+      m['host_time'] = host_time
+      self.rover_logs[host_offset] = m
+
   def process_message(self, host_offset, host_time, msg):
-    self._process_pos(host_offset, host_time, msg)
+    """Dispatches specific message types to the appropriate
+    tables.
+
+    Parameters
+    ----------
+    host_offset : int
+      Millisecond offset since beginning of log.
+    host_time : int
+      Host UNIX epoch (UTC)
+    msg : SBP message
+      SBP message payload
+
+    """
     self._process_eph(host_offset, host_time, msg)
+    self._process_iar(host_offset, host_time, msg)
+    self._process_log(host_offset, host_time, msg)
     self._process_obs(host_offset, host_time, msg)
     self._process_tracking(host_offset, host_time, msg)
-    self._process_iar(host_offset, host_time, msg)
+    self._process_pos(host_offset, host_time, msg)
 
   def save(self, filename):
     if os.path.exists(filename):
@@ -152,6 +184,7 @@ class StoreToHDF5(object):
     f.put('rover_rtk_ecef', pd.DataFrame(self.rover_rtk_ecef))
     f.put('rover_tracking', pd.Panel(self.rover_tracking))
     f.put('rover_iar_state', pd.DataFrame(self.rover_iar_state))
+    f.put('rover_logs', pd.DataFrame(self.rover_logs))
     f.close()
 
 
@@ -186,7 +219,7 @@ def main():
     for delta, timestamp, msg in log.next():
       i += 1
       if i % logging_interval == 0:
-        print "Processed %d records! @ %s sec." \
+        print "Processed %d records! @ %.1f sec." \
           % (i, time.time() - start)
       processor.process_message(delta, timestamp, msg)
       if num_records is not None and i >= int(num_records):
