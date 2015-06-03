@@ -44,15 +44,13 @@ def interpolate_gpst_model(df_gps):
   return pd.ols(y=gps_offset_y, x=log_offset_x, intercept=True)
 
 
-def apply_gps_time(host_offset, init_offset, init_date, model):
+def apply_gps_time(host_offset, init_date, model):
   """Interpolates a GPS datetime based on a record's host log offset.
 
   Parameters
   ----------
   host_offset : int
-    Millisecond offset since beginning of log.
-  init_offset : int
-    host_offset of the first GPS time in the table.
+    Second offset since beginning of log.
   model : pandas.stats.ols.OLS
     Pandas OLS model mapping host offset to GPS offset
 
@@ -61,7 +59,7 @@ def apply_gps_time(host_offset, init_offset, init_date, model):
   pandas.tslib.Timestamp
 
   """
-  gps_offset = model.beta.x * (host_offset - init_offset) + model.beta.intercept
+  gps_offset = model.beta.x * host_offset + model.beta.intercept
   return init_date + pd.Timedelta(seconds=gps_offset)
 
 
@@ -80,9 +78,8 @@ def get_gps_time_col(store, tabs):
   """
   idx = store.rover_spp.T.host_offset.reset_index()
   model = interpolate_gpst_model(idx)
-  init_offset = store.rover_spp.T.host_offset[0]
   init_date = store.rover_spp.T.index[0]
-  f= lambda t1: apply_gps_time(t1*MSEC_TO_SEC, init_offset, init_date, model)
+  f = lambda t1: apply_gps_time(t1*MSEC_TO_SEC, init_date, model)
   gpst_key = 'approx_gps_time'
   for tab in tabs:
     if isinstance(store[tab], pd.DataFrame):
