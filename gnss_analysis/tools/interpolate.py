@@ -48,7 +48,8 @@ def main():
   parser.add_argument('-v', '--verbose',
                       action='store_true',
                       help='Verbose output.')
-  gps_time_tabs = ['rover_iar_state', 'rover_logs', 'rover_tracking']
+  gps_time_tabs = ['rover_iar_state', 'rover_logs', 'rover_tracking',
+                   'rover_acq', 'rover_thread_state', 'rover_uart_state']
   # TODO (Buro): Add in handling for explicit overwrites. Currently,
   # this will fill in and overwrite (specifically sdiffs, etc.) that
   # you might have.
@@ -70,7 +71,7 @@ def main():
         print "Verbose output specified..."
         print "Loading table %s ." % str(store)
         print "Interpolating times for tables %s." % ', '.join(gps_time_tabs)
-      get_gps_time_col(store, gps_time_tabs)
+      get_gps_time_col(store, gps_time_tabs, verbose)
     except (KeyboardInterrupt, SystemExit):
       print "Exiting!"
       sys.exit()

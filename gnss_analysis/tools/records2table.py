@@ -41,6 +41,7 @@ from sbp.client.loggers.json_logger import JSONLogIterator
 from sbp.utils import exclude_fields, walk_json_dict
 import os
 import pandas as pd
+import sbp.acquisition as acq
 import sbp.navigation as nav
 import sbp.observation as ob
 import sbp.piksi as piksi
@@ -72,6 +73,9 @@ class StoreToHDF5(object):
     self.rover_tracking = {}
     self.rover_iar_state = {}
     self.rover_logs = {}
+    self.rover_thread_state = {}
+    self.rover_uart_state = {}
+    self.rover_acq = {}
     self.time = None
 
   def _process_obs(self, host_offset, host_time, msg):
@@ -130,11 +134,14 @@ class StoreToHDF5(object):
       # Flatten a bit: reindex at the top level by prn and remove the
       # 'states' field from the message.
       for s in msg.states:
-        m[s.prn] = walk_json_dict(s)
-        m[s.prn].update({'host_offset': host_offset,
-                         'host_time': host_time})
+        d = walk_json_dict(s)
+        d['host_offset'] = host_offset
+        d['host_time'] = host_time
+        if s.prn in self.rover_tracking:
+          self.rover_tracking[s.prn].update({host_offset: d})
+        else:
+          self.rover_tracking[s.prn] = {host_offset: d}
       del m['states']
-      self.rover_tracking[host_offset] = m
 
   def _process_iar(self, host_offset, host_time, msg):
     if type(msg) is piksi.MsgIarState:
@@ -150,6 +157,52 @@ class StoreToHDF5(object):
       m['host_time'] = host_time
       self.rover_logs[host_offset] = m
 
+  def _process_thread_state(self, host_offset, host_time, msg):
+    if type(msg) is piksi.MsgThreadState:
+      m = exclude_fields(msg)
+      m['host_offset'] = host_offset
+      m['host_time'] = host_time
+      m['cpu'] *= 0.1 # Scale from 1000. to 100.
+      name = m['name'].rstrip('\x00')
+      del m['name']
+      if len(name) > 0:
+        if name in self.rover_thread_state:
+          self.rover_thread_state[name].update({host_offset: m})
+        else:
+          self.rover_thread_state[name] = {host_offset: m}
+
+  def _process_uart_state(self, host_offset, host_time, msg):
+    if type(msg) is piksi.MsgUartState:
+      m = exclude_fields(msg)
+      for i in ['uart_a', 'uart_b']:
+        n = walk_json_dict(m[i])
+        n['host_offset'] = host_offset
+        n['host_time'] = host_time
+        # Normalize to percentage from 255.
+        n['rx_buffer_level'] = m[i]['rx_buffer_level'] / 255.
+        n['tx_buffer_level'] = m[i]['tx_buffer_level'] / 255.
+        if i in self.rover_uart_state:
+          self.rover_uart_state[i].update({host_offset: n})
+        else:
+          self.rover_uart_state[i] = {host_offset: n}
+      l = walk_json_dict(m['latency'])
+      l['host_offset'] = host_offset
+      l['host_time'] = host_time
+      if 'latency' in self.rover_uart_state:
+        self.rover_uart_state['latency'].update({host_offset: l})
+      else:
+        self.rover_uart_state['latency'] = {host_offset: l}
+
+  def _process_acq(self, host_offset, host_time, msg):
+    if type(msg) is acq.MsgAcqResult:
+      m = exclude_fields(msg)
+      m['host_offset'] = host_offset
+      m['host_time'] = host_time
+      if m['prn'] in self.rover_acq:
+        self.rover_acq[m['prn']].update({host_offset: m})
+      else:
+        self.rover_acq[m['prn']] = {host_offset: m}
+
   def process_message(self, host_offset, host_time, msg):
     """Dispatches specific message types to the appropriate
     tables.
@@ -164,12 +217,15 @@ class StoreToHDF5(object):
       SBP message payload
 
     """
+    self._process_acq(host_offset, host_time, msg)
     self._process_eph(host_offset, host_time, msg)
     self._process_iar(host_offset, host_time, msg)
     self._process_log(host_offset, host_time, msg)
     self._process_obs(host_offset, host_time, msg)
-    self._process_tracking(host_offset, host_time, msg)
     self._process_pos(host_offset, host_time, msg)
+    self._process_tracking(host_offset, host_time, msg)
+    self._process_thread_state(host_offset, host_time, msg)
+    self._process_uart_state(host_offset, host_time, msg)
 
   def save(self, filename):
     if os.path.exists(filename):
@@ -185,6 +241,9 @@ class StoreToHDF5(object):
     f.put('rover_tracking', pd.Panel(self.rover_tracking))
     f.put('rover_iar_state', pd.DataFrame(self.rover_iar_state))
     f.put('rover_logs', pd.DataFrame(self.rover_logs))
+    f.put('rover_thread_state', pd.Panel(self.rover_thread_state))
+    f.put('rover_uart_state', pd.Panel(self.rover_uart_state))
+    f.put('rover_acq', pd.Panel(self.rover_acq))
     f.close()
 
 
