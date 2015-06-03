@@ -14,9 +14,10 @@
 """
 
 import pandas as pd
+import numpy as np
 
-USEC_TO_SEC = 10**-6
-MSEC_TO_SEC = 10**-3
+USEC_TO_SEC = 1e-6
+MSEC_TO_SEC = 1e-3
 
 import warnings
 warnings.filterwarnings('ignore', category=pd.io.pytables.PerformanceWarning)
@@ -38,7 +39,7 @@ def interpolate_gpst_model(df_gps):
   """
   init_gps_t = pd.to_datetime(df_gps['index'][0])
   gps_offset = pd.to_datetime(df_gps['index']) - init_gps_t
-  gps_offset_y = gps_offset.dt.seconds + gps_offset.dt.microseconds*USEC_TO_SEC
+  gps_offset_y = gps_offset / np.timedelta64(1, 's')
   log_offset_x = df_gps.host_offset*MSEC_TO_SEC
   return pd.ols(y=gps_offset_y, x=log_offset_x, intercept=True)
 
