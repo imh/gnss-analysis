@@ -32,13 +32,17 @@ def test_interpolate_gps_time():
                        [1.00000368376, -64.2579561376])
     init_offset = store.rover_spp.T.host_offset[0]
     init_date = store.rover_spp.T.index[0]
-    l = store.rover_logs.T.host_offset.tolist()
-    start = t.apply_gps_time(l[0]*t.MSEC_TO_SEC, init_offset, init_date, model)
-    assert start == Timestamp("2015-04-29 05:41:47.035327")
-    end = t.apply_gps_time(l[-1]*t.MSEC_TO_SEC, init_offset, init_date, model)
-    assert end == Timestamp("2015-04-29 06:06:38.220820")
-    f = lambda t1: t.apply_gps_time(t1*t.MSEC_TO_SEC, init_offset, init_date, model)
+    f = lambda t1: t.apply_gps_time(t1*t.MSEC_TO_SEC, init_date, model)
     dates = store.rover_logs.T.host_offset.apply(f)
+    l = dates.tolist()
+    start, end = l[0], l[-1]
+    assert start == Timestamp("2015-04-29 23:32:55.272075")
+    assert end == Timestamp("2015-04-29 23:57:46.457568")
+    init_secs_offset \
+      = store.rover_spp.T.host_offset[0] - store.rover_logs.T.index[0]
+    assert np.allclose([init_secs_offset*t.MSEC_TO_SEC], [55.859])
+    assert (init_date - start) == Timedelta('0 days 00:00:55.848925')
+    assert (end - init_date) == Timedelta('0 days 00:23:55.336568')
     assert pd.DatetimeIndex(dates).is_monotonic_increasing
     assert dates.shape == (2457,)
 
