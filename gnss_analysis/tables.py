@@ -13,8 +13,9 @@
 
 """
 
-import pandas as pd
 import numpy as np
+import pandas as pd
+import warnings
 
 USEC_TO_SEC = 1e-6
 MSEC_TO_SEC = 1e-3
@@ -63,7 +64,7 @@ def apply_gps_time(host_offset, init_date, model):
   return init_date + pd.Timedelta(seconds=gps_offset)
 
 
-def get_gps_time_col(store, tabs):
+def get_gps_time_col(store, tabs, verbose=False):
   """Given an HDFStore and a list of tables in that HDFStore,
   interpolates GPS times for the desired tables and inserts the
   appropriate columns in the table.
@@ -82,15 +83,21 @@ def get_gps_time_col(store, tabs):
   f = lambda t1: apply_gps_time(t1*MSEC_TO_SEC, init_date, model)
   gpst_key = 'approx_gps_time'
   for tab in tabs:
-    if isinstance(store[tab], pd.DataFrame):
+    # Because this is largely a research tool and the tables are
+    # constantly in flux, just warn if the specified table isn't in
+    # the table when interpolating.
+    if verbose:
+      print "Interpolating approx_gps_time for %s." % tab
+    if tab not in store:
+      warnings.warn("%s not found in Pandas table" % tab, UserWarning)
+    elif isinstance(store[tab], pd.DataFrame):
       dft = store[tab].T
       dft[gpst_key] = store[tab].T.host_offset.apply(f)
       store[tab] = dft.T
     elif isinstance(store[tab], pd.Panel):
-      x = store[tab].transpose(2, 0, 1)
       y = {}
-      for prn in x.items:
-        y[prn] = x[prn, :, 'host_offset'].dropna().apply(f)
-      ans = store[tab].transpose(1, 2, 0)
-      ans[gpst_key] = pd.DataFrame(y).T
-      store[tab] = ans.transpose(2, 0, 1)
+      for prn in store[tab].items:
+        y[prn] = store[tab][prn, 'host_offset', :].dropna().apply(f)
+      ans = store[tab].transpose(1, 0, 2)
+      ans['approx_gps_time'] = pd.DataFrame(y).T
+      store[tab] = ans.transpose(1, 0, 2)

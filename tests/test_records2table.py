@@ -139,7 +139,7 @@ def test_hdf5():
           {'n_sats': 8.0,
            'x': -2704370.9813769697}}
     assert isinstance(store.rover_tracking, pd.Panel)
-    assert store.rover_tracking.shape == (318, 5, 19)
+    assert store.rover_tracking.shape == (19, 5, 318)
     rd = store.rover_tracking[0, :, :].to_dict()
     assert rd.keys() == [0, 4, 6, 7, 8, 9, 10, 11, 12, 13, 14,
                          16, 18, 19, 20, 21, 25, 27, 29]
