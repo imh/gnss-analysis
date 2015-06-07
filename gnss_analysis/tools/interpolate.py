@@ -32,7 +32,7 @@ titled 'approx_gps_time'.
 
 """
 
-from gnss_analysis.tables import get_gps_time_col
+from gnss_analysis.tables import get_gps_time_col, reindex_tables
 import pandas as pd
 
 def main():
@@ -71,7 +71,8 @@ def main():
         print "Verbose output specified..."
         print "Loading table %s ." % str(store)
         print "Interpolating times for tables %s." % ', '.join(gps_time_tabs)
-      get_gps_time_col(store, gps_time_tabs, verbose)
+      get_gps_time_col(store, gps_time_tabs, verbose=verbose)
+      reindex_tables(store, ['rover_iar_state', 'rover_logs'], verbose=verbose)
     except (KeyboardInterrupt, SystemExit):
       print "Exiting!"
       sys.exit()
