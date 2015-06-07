@@ -44,6 +44,7 @@ import pandas as pd
 import sbp.acquisition as acq
 import sbp.navigation as nav
 import sbp.observation as ob
+import sbp.deprecated as dep
 import sbp.piksi as piksi
 import sbp.tracking as tr
 import sbp.logging as lg
@@ -93,7 +94,7 @@ class StoreToHDF5(object):
           t[time] = {o.prn: v}
 
   def _process_eph(self, host_offset, host_time, msg):
-    if type(msg) is ob.MsgEphemeris or type(msg) is tr.MsgEphemerisOld:
+    if type(msg) is ob.MsgEphemeris or type(msg) is dep.MsgEphemerisDeprecated:
       if msg.healthy == 1 and msg.valid == 1:
         time = gpstime.gpst_components2datetime(msg.toe_wn, msg.toe_tow)
         m = exclude_fields(msg)
