@@ -19,6 +19,7 @@ import gnss_analysis.tables as t
 import numpy as np
 import os
 import pandas as pd
+import pytest
 
 
 def test_interpolate_gps_time():
@@ -46,6 +47,8 @@ def test_interpolate_gps_time():
     assert pd.DatetimeIndex(dates).is_monotonic_increasing
     assert dates.shape == (2457,)
 
+
+@pytest.mark.slow
 def test_gps_time_col():
   filename = "data/serial-link-20150429-163230.log.json.hdf5"
   assert os.path.isfile(filename)
@@ -60,3 +63,18 @@ def test_gps_time_col():
     assert pd.DatetimeIndex(gpst).is_monotonic_increasing
     gpst = store.rover_tracking[:, 'approx_gps_time', :]
     assert gpst.shape == (32, 7248)
+
+
+def test_gaps():
+  td = pd.DatetimeIndex(['2015-05-21 21:24:52.200000',
+                         '2015-05-21 21:24:52.400000',
+                         '2015-05-21 21:24:52.600000',
+                         '2015-05-21 21:25:52.800000',
+                         '2015-05-21 21:27:53'],
+                        dtype='datetime64[ns]',
+                        freq=None, tz=None)
+  assert np.allclose(t.find_largest_gaps(td, 10).values,
+                     [120.2, 60.2, 0.2, 0.2])
+  assert np.allclose(t.find_largest_gaps(td, 1).values, [120.2])
+  assert np.allclose(t.find_largest_gaps(td[0:2], 10).values, [0.2])
+  assert np.allclose(t.find_largest_gaps(td[0:1], 10).values, [0])

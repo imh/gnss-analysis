@@ -130,3 +130,23 @@ def reindex_tables(store, tabs, gpst_col='approx_gps_time', verbose=False):
       store[tab] = store[tab].T.set_index(gpst_col).T
     elif isinstance(store[tab], pd.Panel):
       assert NotImplementedError
+
+
+def find_largest_gaps(idx, n=10):
+  """Given a time series index, finds the n largest gaps.  you may use
+  this, for example, to find the time (endpoint) and duration of gaps
+  in satellite observations.
+
+  Parameters
+  ----------
+  idx : Pandas DatetimeIndex
+  n : int
+    n largest to return. Defaults to 10.
+
+  Returns
+  -------
+  Pandas DatetimeIndex
+
+  """
+  adj =(idx - idx[0])/pd.Timedelta('00:00:01')
+  return pd.Series(adj, idx).diff().nlargest(n)
