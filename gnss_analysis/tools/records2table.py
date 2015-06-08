@@ -49,6 +49,7 @@ import sbp.piksi as piksi
 import sbp.tracking as tr
 import sbp.logging as lg
 import swiftnav.gpstime as gpstime
+import time
 
 from_base = lambda msg: msg.sender == 0
 time_fn = gpstime.gpst_components2datetime
@@ -69,6 +70,7 @@ class StoreToHDF5(object):
     self.rover_obs = {}
     self.ephemerides = {}
     self.rover_spp = {}
+    self.rover_llh = {}
     self.rover_rtk_ned = {}
     self.rover_rtk_ecef = {}
     self.rover_tracking = {}
@@ -114,6 +116,10 @@ class StoreToHDF5(object):
         time = time_fn(self.time.wn, msg.tow / MSEC_TO_SECONDS)
         m['tow'] /= MSEC_TO_SECONDS
         self.rover_spp[time] = m
+      elif type(msg) is nav.MsgPosLLH:
+        time = time_fn(self.time.wn, msg.tow / MSEC_TO_SECONDS)
+        m['tow'] /= MSEC_TO_SECONDS
+        self.rover_llh[time] = m
       elif type(msg) is nav.MsgBaselineNED:
         time = time_fn(self.time.wn, msg.tow / MSEC_TO_SECONDS)
         m['tow'] /= MSEC_TO_SECONDS
@@ -237,6 +243,7 @@ class StoreToHDF5(object):
     f.put('rover_obs', pd.Panel(self.rover_obs))
     f.put('ephemerides', pd.Panel(self.ephemerides))
     f.put('rover_spp', pd.DataFrame(self.rover_spp))
+    f.put('rover_llh', pd.DataFrame(self.rover_llh))
     f.put('rover_rtk_ned', pd.DataFrame(self.rover_rtk_ned))
     f.put('rover_rtk_ecef', pd.DataFrame(self.rover_rtk_ecef))
     f.put('rover_tracking', pd.Panel(self.rover_tracking))
@@ -248,12 +255,27 @@ class StoreToHDF5(object):
     f.close()
 
 
+def hdf5_write(log_datafile, filename, verbose=False):
+  processor = StoreToHDF5()
+  i = 0
+  logging_interval = 10000
+  start = time.time()
+  with JSONLogIterator(log_datafile) as log:
+    for delta, timestamp, msg in log.next():
+      i += 1
+      if verbose and i % logging_interval == 0:
+        print "Processed %d records! @ %.1f sec." % (i, time.time() - start)
+      processor.process_message(delta, timestamp, msg)
+    print "Processed %d records!" % i
+    processor.save(filename)
+  return filename
+
+
 def main():
   """Fuck some Pandas
 
   """
   import argparse
-  import time
   parser = argparse.ArgumentParser(description='Swift Nav SBP log to HDF5 table tool.')
   parser.add_argument('file',
                       help='Specify the log file to use.')
