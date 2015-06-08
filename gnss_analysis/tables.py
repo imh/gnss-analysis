@@ -15,6 +15,7 @@ have explicit GPS times.
 
 """
 
+from gnss_analysis.stats_utils import truthify
 import numpy as np
 import pandas as pd
 import warnings
@@ -150,3 +151,72 @@ def find_largest_gaps(idx, n=10):
   """
   adj =(idx - idx[0])/pd.Timedelta('00:00:01')
   return pd.Series(adj, idx).diff().nlargest(n)
+
+
+def get_sdiff(obs_type, rover_obs,  base_obs):
+  """For a given observation type, produces single-differenced
+  observations from the base station and the rover.
+
+  Parameters
+  ----------
+  obs_type : observation key, either 'P' (pseudorange) or 'L' (carrier phase)
+  rover_obs : Panel of Rover observations
+  base_obs : Panel of Base observations
+
+  Returns
+  -------
+  DataFrame of single-difference observations
+
+  """
+  assert obs_type in ['P', 'L'], "Invalid obs_type: %s" % obs_type
+  sdiff = rover_obs[:, obs_type, :] - base_obs[:, obs_type, :]
+  return sdiff.dropna(how='all', axis=[0, 1]).T
+
+
+def get_ref_sat(sdiff):
+  """Given a set of single-difference observations, determine a
+  reference satellite. By convention, this is the satellite with the
+  most observations.
+
+  Parameters
+  ----------
+  sdiff : DataFrame of single-difference observations.
+
+  Returns
+  -------
+  int, prn of reference sat
+
+  """
+  return sdiff.count().argmax()
+
+
+def get_ddiff(ref_sat, sdiff):
+  """Given a reference satellite and sdiff observations, returns double
+  difference observations.
+
+  Parameters
+  ----------
+  ref_sat : int, reference satellite
+  sdiff : DataFrame of single-difference observations.
+
+  Returns
+  -------
+  Pandas DatetimeIndex
+
+  """
+  return sdiff - sdiff[ref_sat]
+
+
+def get_ddiff_t(ddiff):
+  """Produces "truthified" double-difference observation. Essentially a median
+  filter/smoothing of the double-difference observations.
+
+  Parameters
+  ----------
+  ddiff : DataFrame of double-differenced observations
+
+  Returns
+  -------
+  Pandas DataFrame
+  """
+  return ddiff - truthify(ddiff)
