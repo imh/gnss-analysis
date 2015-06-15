@@ -298,7 +298,7 @@ def mark_large_gaps(t, n=10, threshold=1.):
 
 def mark_fixed2float(t):
   l = t.rover_rtk_ned.T[['flags']].diff().dropna()
-  return l[l > 0]
+  return l[l < 0].dropna()
 
 
 def mark_flash_saves(t):
@@ -340,6 +340,14 @@ def mark_errors(t):
 
 def mark_warnings(t):
   return prefix_match_text(t.rover_logs, "WARNING:")
+
+
+def mark_obs_matching(t):
+  return prefix_match_text(t.rover_logs, "WARNING: Obs Matching:")
+
+
+def mark_starting(t):
+  return prefix_match_text(t.rover_logs, "Piksi Starting")
 
 
 class LogAnnotator(object):
@@ -411,15 +419,15 @@ def plot_pos_parametric(log):
   """Parametric plot of position data from a testing log.
 
   """
-  fig, axs = plt.subplots(1,2, sharey=False, figsize=(18,8))
+  fig, axs = plt.subplots(1, 2, sharey=False, figsize=(18, 8))
   bounds = get_bounds(log.rover_llh.T[['lat', 'lon']])
-  log.rover_llh.T[['lat','lon']].plot(kind='scatter',
-                                      x='lat',
-                                      y='lon',
-                                      ylim=(bounds[0][1], bounds[1][1]),
-                                      xlim=(bounds[0][0], bounds[1][0]),
-                                      title="Rover SPP (degrees/LLH)",
-                                      ax=axs[0])
+  log.rover_llh.T[['lat', 'lon']].plot(kind='scatter',
+                                       x='lat',
+                                       y='lon',
+                                       ylim=(bounds[0][1], bounds[1][1]),
+                                       xlim=(bounds[0][0], bounds[1][0]),
+                                       title="Rover SPP (degrees/LLH)",
+                                       ax=axs[0])
   fixed = get_rtk_fixed(log)
   axs[1].set_title("Rover RTK Fixed(Blue) / Float(Red) (meters/NED)")
   if not fixed.empty:
@@ -551,9 +559,10 @@ def plot_stuff(hitl_log, start=None, end=None, ann_logs=True, plot_anns=[]):
 
 # TODO (Buro): Replace with a proper os.path'd version
 
+DEFAULT_SWIFT_TMP_DIR = '/swift/s3/'
 
 def process_raw_log(date, verbose=False):
-  local_dest = '/tmp/s3/'
+  local_dest = DEFAULT_SWIFT_TMP_DIR
   bucket_name = 'jenkins-backups-yz0bhivofjsjaieaebquxp'
   base_prefix = '/builds/'
   path = local_dest + bucket_name + base_prefix + "/" + date
@@ -575,7 +584,7 @@ def process_raw_log(date, verbose=False):
 
 
 def get_from_s3(date,
-                local_dest='/tmp/s3/',
+                local_dest=DEFAULT_SWIFT_TMP_DIR,
                 access_key=os.getenv('AWS_ACCESS_KEY_ID', None),
                 secret_key=os.getenv('AWS_SECRET_ACCESS_KEY', None),
                 verbose=False):
@@ -601,7 +610,7 @@ def get_from_s3(date,
         print "Damn! ... Snap! S3 %s already exists at %s" % (key, path)
 
 
-def find_date(date, path='/tmp/s3/'):
+def find_date(date, path=DEFAULT_SWIFT_TMP_DIR):
   new_files = []
   for root, dirnames, filenames in os.walk(path):
     for filename in fnmatch.filter(filenames, 'serial*.hdf5'):
