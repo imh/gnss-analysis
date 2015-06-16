@@ -71,8 +71,13 @@ def main():
         print "Verbose output specified..."
         print "Loading table %s ." % str(store)
         print "Interpolating times for tables %s." % ', '.join(gps_time_tabs)
-      get_gps_time_col(store, gps_time_tabs, verbose=verbose)
-      reindex_tables(store, ['rover_iar_state', 'rover_logs'], verbose=verbose)
+      if not store.rover_spp.empty:
+        get_gps_time_col(store, gps_time_tabs, verbose=verbose)
+        reindex_tables(store,
+                       ['rover_iar_state', 'rover_logs'],
+                       verbose=verbose)
+      else:
+        raise Exception("No single-point solutions available for interpolation.")
     except (KeyboardInterrupt, SystemExit):
       print "Exiting!"
       sys.exit()

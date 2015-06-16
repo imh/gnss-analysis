@@ -350,18 +350,16 @@ def mark_starting(t):
   return prefix_match_text(t.rover_logs, "Piksi Starting")
 
 
-class LogAnnotator(object):
-  """Given a HITL HDFSore, annotates key events and provides plotting
-  help.
+def mark_hardfaults(t):
+  return prefix_match_text(t.rover_logs, "ERROR: HardFaultVector")
 
-  """
 
-  def __init__(self, hitl_log, events):
-    self.events = dict([(e.name, e) for e in events])
-
+def mark_watchdog_reset(t):
+  return prefix_match_text(t.rover_logs, "ERROR: Piksi has reset due to a watchdog timeout")
 
 #####################################################################
 ## Plotting stuff
+
 
 def get_center_pos(t):
   """Geodetic center point.
@@ -577,8 +575,11 @@ def process_raw_log(date, verbose=False):
                       root + "/" + filename + '.hdf5',
                       verbose)
       with pd.HDFStore(nf) as store:
-        get_gps_time_col(store, gps_time_tabs, verbose=verbose)
-        reindex_tables(store, ['rover_iar_state', 'rover_logs'], verbose=verbose)
+        if not store.rover_spp.empty:
+          get_gps_time_col(store, gps_time_tabs, verbose=verbose)
+          reindex_tables(store,
+                         ['rover_iar_state', 'rover_logs'],
+                         verbose=verbose)
       new_files.append(nf)
   return new_files
 
@@ -616,4 +617,4 @@ def find_date(date, path=DEFAULT_SWIFT_TMP_DIR):
     for filename in fnmatch.filter(filenames, 'serial*.hdf5'):
       if date in root:
         new_files.append(root + '/' + filename)
-  return new_files
+  return sorted(new_files)
