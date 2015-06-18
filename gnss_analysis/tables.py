@@ -581,7 +581,7 @@ def process_raw_log(date, verbose=False):
                          ['rover_iar_state', 'rover_logs'],
                          verbose=verbose)
       new_files.append(nf)
-  return new_files
+  return sorted(new_files)
 
 
 def get_from_s3(date,
@@ -618,3 +618,8 @@ def find_date(date, path=DEFAULT_SWIFT_TMP_DIR):
       if date in root:
         new_files.append(root + '/' + filename)
   return sorted(new_files)
+
+
+def get(log_date, verbose=False):
+  get_from_s3(log_date, verbose)
+  return process_raw_log(log_date, verbose)
