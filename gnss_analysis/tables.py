@@ -557,10 +557,12 @@ def plot_stuff(hitl_log, start=None, end=None, ann_logs=True, plot_anns=[]):
 
 # TODO (Buro): Replace with a proper os.path'd version
 
-DEFAULT_SWIFT_TMP_DIR = '/swift/s3/'
+DEFAULT_SWIFT_TMP_DIR = os.getenv('SWIFT_TMP',
+                                  os.path.expanduser("~") + '/swift_tmp/s3/')
 
-def process_raw_log(date, verbose=False):
-  local_dest = DEFAULT_SWIFT_TMP_DIR
+def process_raw_log(date,
+                    local_dest=DEFAULT_SWIFT_TMP_DIR,
+                    verbose=False):
   bucket_name = 'jenkins-backups-yz0bhivofjsjaieaebquxp'
   base_prefix = '/builds/'
   path = local_dest + bucket_name + base_prefix + "/" + date
