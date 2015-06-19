@@ -437,119 +437,162 @@ def plot_pos_parametric(log):
   axs[1].hlines(y=0, xmin=fixed.min()['e'], xmax=fixed.max()['e'], color='black')
 
 
-def plot_stuff(hitl_log, start=None, end=None, ann_logs=True, plot_anns=[]):
-  base_cn0 = hitl_log.base_obs[:, 'cn0', :].T
-  rover_cn0 = hitl_log.rover_obs[:, 'cn0', :].T
-  if start is None:
-    start = rover_cn0.index[0]
-  if end is None:
-    end = base_cn0.index[-1]
+def build_panel(rover_log, k, gpst_key='approx_gps_time'):
+  buf = {}
+  for item in rover_log.rover_thread_state.items:
+    gpst_key = 'approx_gps_time'
+    buf[item] = rover_log.rover_thread_state[item].T.set_index(gpst_key).dropna()[k]
+  return (buf, list(rover_log.rover_thread_state.items))
 
-  # Observations
-  sdiff_L = get_sdiff('L', hitl_log.rover_obs, hitl_log.base_obs)
-  ddiff_L = get_ddiff(get_ref_sat(sdiff_L), sdiff_L)
-  sdiff_P = get_sdiff('P', hitl_log.rover_obs, hitl_log.base_obs)
-  ddiff_P = get_ddiff(get_ref_sat(sdiff_L), sdiff_L)
-  ddiff_L_t, ddiff_P_t = get_ddiff_t(ddiff_L), get_ddiff_t(ddiff_P)
 
-  # Fixed RTK solution
-  fixed = get_rtk_fixed(hitl_log)
-  fixed_r = get_distances(fixed, loc.NOVATEL_BASELINE_1)
+def build_thread_state(rover_log):
+  cpus = {}
+  stacks = {}
+  for item in rover_log.rover_thread_state.items:
+    gpst_key = 'approx_gps_time'
+    d = rover_log.rover_thread_state[item].T.set_index(gpst_key).dropna()
+    cpus[item] = d['cpu']
+    stacks[item] = d['stack_free']
+  return (cpus, stacks, list(rover_log.rover_thread_state.items))
 
-  # Float RTK solution
-  float_pos = get_rtk_float(hitl_log)
-  float_r = get_distances(float_pos, loc.NOVATEL_BASELINE_1)
 
-  # SPP solution
-  spp = get_spp(hitl_log)
-  spp_r = get_distances(spp, loc.NOVATEL_ABSOLUTE_1)
+def plot_thread_state(cpus, stacks, threads, axs):
+  for thread in threads:
+    cpus[thread].plot(ax=axs[0], title="CPU thread usage", label=thread)
+  axs[0].legend(axs[0].get_lines(), threads, loc='upper right')
+  for thread in threads:
+    stacks[thread].plot(ax=axs[1], title="CPU stack usage", label=thread)
+  axs[1].legend(axs[1].get_lines(), threads, loc='upper right')
 
-  # IAR state
-  iar_state = hitl_log.rover_iar_state.T['num_hyps']
 
-  # Setup annotations
-  anns = [('log_flash', mark_flash_saves(hitl_log)),
-          ('log_trusted_eph', mark_new_trusted_ephs(hitl_log)),
-          ('log_new_untrusted_ephs', mark_new_untrusted_ephs(hitl_log)),
-          ('log_pvt', mark_pvt_warning(hitl_log)),
-          ('log_soln_deadline', mark_soln_deadline(hitl_log)),
-          ('log_iar', mark_iar(hitl_log)),
-          ('log_iar_sats', mark_iar_add_sats(hitl_log)),
-          ('log_errors', mark_errors(hitl_log)),
-          ('log_warnings', mark_warnings(hitl_log)),
-          ('fixed2float', mark_fixed2float(hitl_log)),
-          ('obs_gaps', mark_obs_gaps(hitl_log)),
-          ('large_fixed_error', mark_large_position_errors(fixed, loc.NOVATEL_BASELINE_1)),
-          ('large_fixed_jump', mark_large_jumps(fixed, loc.NOVATEL_BASELINE_1)),
-          ('large_float_error', mark_large_position_errors(float_pos, loc.NOVATEL_BASELINE_1)),
-          ('large_float_jump', mark_large_jumps(float_pos, loc.NOVATEL_BASELINE_1)),
-          ('large_spp_error', mark_large_position_errors(spp, loc.NOVATEL_ABSOLUTE_1)),
-          ('large_spp_jump', mark_large_jumps(spp, loc.NOVATEL_ABSOLUTE_1))
-         ]
-  anns = dict(anns)
+class Plotter(object):
+  """
+  """
 
-  # Plot stuff
-  n_plots = 11
-  n = 0
-  fig, axs = plt.subplots(n_plots, 1, figsize=(16, 6*n_plots), sharex=True)
-  if not fixed.truncate(start, end).empty:
-    fixed.truncate(start, end).plot(ax=axs[n],
-                                    title='HITL NED Fixed Baseline (meters)'); n+=1
-    fixed_r.truncate(start, end).plot(ax=axs[n],
-                                      title='HITL NED Baseline Magnitude Error (meters)'); n+=1
-    fixed_r[fixed_r < 1500].truncate(start, end).plot(ax=axs[n],
-                               title='HITL NED Baseline Magnitude Error (below 1000m) (meters)'); n+=1
+  def __init__(self, hitl_log, ref_pos=(None, None), verbose=True):
+    self.hitl_log = hitl_log
+    self.verbose = verbose
+    self.ref_rtk, self.ref_spp = ref_pos
 
-  if not float_pos.truncate(start, end).empty:
-    float_pos.truncate(start, end).plot(ax=axs[n],
-                                        title='HITL NED Float Baseline (meters)'); n+=1
-    float_r[float_r < 1500].truncate(start, end).plot(ax=axs[n],
-                                                      title='HITL NED Baseline Magnitude Error (below 1000m) (meters)'); n+=1
+  def interpolate(self):
+    """
+    """
+    # Define start and end of time series around GPS observation SNR
+    self.base_cn0 = self.hitl_log.base_obs[:,'cn0',:].T
+    self.rover_cn0 = self.hitl_log.rover_obs[:,'cn0',:].T
+    self.index = self.rover_cn0.index
+    self.i = self.index[0]
+    self.j = self.index[-1]
+    if self.verbose:
+      print "\nRover obs start @ %s and end @ %s.\n" % (self.i, self.j)
+    self.sdiff_L = get_sdiff('L', self.hitl_log.rover_obs, self.hitl_log.base_obs)
+    self.ddiff_L = get_ddiff(get_ref_sat(self.sdiff_L), self.sdiff_L)
+    self.sdiff_P = get_sdiff('P', self.hitl_log.rover_obs, self.hitl_log.base_obs)
+    self.ddiff_P = get_ddiff(get_ref_sat(self.sdiff_L), self.sdiff_L)
+    self.ddiff_L_t = get_ddiff_t(self.ddiff_L)
+    self.ddiff_P_t = get_ddiff_t(self.ddiff_P)
+    # Fixed and Float RTK solution
+    self.fixed = get_rtk_fixed(self.hitl_log)
+    self.fixed_r = get_distances(self.fixed, self.ref_rtk)
+    # Float RTK solution
+    self.float_pos = get_rtk_float(self.hitl_log)
+    self.float_r = get_distances(self.float_pos, self.ref_rtk)
+    # SPP solution
+    self.spp = get_spp(self.hitl_log)
+    self.spp_r = get_distances(self.spp, self.ref_spp)
+    # IAR state
+    self.iar_state = self.hitl_log.rover_iar_state.T['num_hyps']
 
-  if not spp_r.truncate(start, end).empty:
-    spp_r.truncate(start, end).plot(ax=axs[n],
-                                    title='HITL SPP Magnitude Error (meters)'); n+=1
+  def annotate(self):
+    """
+    """
+    # Setup annotations
+    anns = [('log_flash', mark_flash_saves(self.hitl_log)['text']),
+            ('log_trusted_eph', mark_new_trusted_ephs(self.hitl_log)['text']),
+            ('log_new_untrusted_ephs', mark_new_untrusted_ephs(self.hitl_log)['text']),
+            ('log_pvt', mark_pvt_warning(self.hitl_log)['text']),
+            ('log_soln_deadline', mark_soln_deadline(self.hitl_log)['text']),
+            ('log_iar', mark_iar(self.hitl_log)['text']),
+            ('log_iar_sats', mark_iar_add_sats(self.hitl_log)['text']),
+            ('log_errors', mark_errors(self.hitl_log)['text']),
+            ('log_warnings', mark_warnings(self.hitl_log)['text']),
+            ('log_obs_matching', mark_obs_matching(self.hitl_log)['text']),
+            ('log_starting', mark_starting(self.hitl_log)['text']),
+            ('log_hardfault', mark_hardfaults(self.hitl_log)['text']),
+            ('log_hardfault_unique', mark_hardfaults(self.hitl_log)['text']),
+            ('log_watchdog', mark_watchdog_reset(self.hitl_log)['text']),
+            ('fixed2float', mark_fixed2float(self.hitl_log)['flags']),
+            ('obs_gaps', mark_obs_gaps(self.hitl_log)),
+            ('large_fixed_error', mark_large_position_errors(self.fixed, self.ref_rtk)),
+            ('large_fixed_jump', mark_large_jumps(self.fixed, self.ref_rtk)),
+            ('large_float_error', mark_large_position_errors(self.float_pos, self.ref_rtk)),
+            ('large_float_jump', mark_large_jumps(self.float_pos, self.ref_rtk)),
+            ('large_spp_error', mark_large_position_errors(self.spp, self.ref_spp)),
+            ('large_spp_jump', mark_large_jumps(self.spp, self.ref_spp))
+           ]
+    self.anns = dict(anns)
+    if self.verbose:
+      print "\n----- Annotations:"
+      for n, ann in self.anns.iteritems():
+        print "{:22s} {:5d}".format(n, len(ann))
+      print "-----\n"
+    return self.anns
 
-  if not sdiff_L.truncate(start, end).empty:
-    sdiff_L.truncate(start, end).plot(ax=axs[n],
-                                      title='SD Carrier Phase (cycles)'); n+=1
-    ddiff_L_t.truncate(start, end).dropna(how='all', axis=1).plot(ax=axs[n],
-                                        title='Smoothed DD Carrier Phase (cycles)'); n+=1
-
-  if not rover_cn0.truncate(start, end).empty:
-    rover_cn0.truncate(start, end).plot(ax=axs[n],
-                                        title='HITL Rover Obs SNR'); n+=1
-    base_cn0.truncate(start, end).plot(ax=axs[n],
-                                       title='HITL Base Obs SNR'); n+=1
-
-  if not iar_state.truncate(start, end).empty:
-    iar_state.truncate(start, end).plot(ax=axs[n],
-                                        title='Rover IAR State (hypotheses)'); n+=1
-
-  # Logging message stuff
-  logs = hitl_log.rover_logs.T['text'].truncate(start, end)
-  if len(logs) > 100:
-    print "Not annotating with logs, there are %d of them." % len(logs)
-  elif ann_logs:
-    print logs
-    for ax in axs[:-1]:
-      for log in logs.index:
-        ax.axvline(log, linewidth=1, color='black', alpha=0.2)
-    for i, log in zip(logs.index, logs):
-      axs[n].text(i, 1, log, rotation='vertical', fontsize=8)
-      axs[n].axis('off')
-    n += 1
-
-  # Show annotations
-  for plot_ann in plot_anns:
-    if anns.get(plot_ann, None):
-      for ax in axs[:-1]:
-        for v in anns[plot_ann].index:
-          ax.axvline(log, linewidth=1, color='black', alpha=0.2)
+  def plot(self, interval=(None, None), ann_logs=True, plot_anns=[]):
+    if all(interval):
+      i, j = interval
     else:
-      warnings.warn('Invalid key %.' % plot_ann)
+      i, j = self.i, self.j
+    if self.verbose:
+      print "\nPlotting from %s to @ %s.\n" % (i, j)
+    # Plot stuff
+    targets = [(self.fixed, 'HITL Fixed Soln (meters/NED)'),
+               (self.fixed_r, 'HITL Fixed Soln Magnitude Error (meters/NED)'),
+               (self.fixed_r[self.fixed_r < 1500], 'HITL Fixed Soln Magnitude Error (below 1000m) (meters/NED)'),
+               (self.float_pos, 'HITL Float Soln (meters/NED)'),
+               (self.float_r[self.float_r < 1500], 'HITL Float Magnitude Error (meters/NED)'),
+               (self.spp_r, 'HITL SPP Soln Error (meters/ECEF)'),
+               (self.sdiff_L, 'SD Carrier Phase (cycles)'),
+               (self.ddiff_L_t, 'Smoothed DD Carrier Phase (cycles)'),
+               (self.rover_cn0, 'HITL Rover Obs SNR'),
+               (self.base_cn0, 'HITL Base Obs SNR'),
+               (self.iar_state, 'Rover IAR State (hypotheses)')
+              ]
+    n_plots = 1 + sum([int(not dat.truncate(i, j).empty) for (dat, t) in targets])
+    if self.verbose:
+      print "Number of plots %d between %s. and %s.\n" % (n_plots, i, j)
+    fig, axs = plt.subplots(n_plots, 1, figsize=(16, 4*n_plots), sharex=True)
+    n = 0
+    for (dat, title) in targets:
+      l = dat.truncate(i, j)
+      if not l.empty:
+        l.plot(ax=axs[n], title=title)
+        axs[n].get_xticklabels()[0].set_visible(True)
+        axs[n].legend(loc='upper right')
+        n += 1
 
-  return anns
+    # Show annotations
+    for plot_ann in plot_anns:
+      if plot_ann not in self.anns:
+        warnings.warn('Invalid key %s.' % plot_ann)
+      elif not self.anns[plot_ann].empty:
+        g = self.anns[plot_ann][i:j]
+        for ax in axs[:-1]:
+          for v in g.index:
+            ax.axvline(v, linewidth=1, color='black', alpha=0.6)
+        for k in g.index:
+          assert isinstance(self.anns[plot_ann], pd.Series), "Key %s not Series." % plot_ann
+          s = "%s: %s" % (plot_ann, self.anns[plot_ann][k])
+          axs[n].text(k, 1, s, rotation='vertical', fontsize=8)
+        if self.verbose:
+          print "\n%s ------" % plot_ann
+          print self.anns[plot_ann]
+          print "------"
+
+    axs[n].set_title('Events')
+    axs[n].spines['top'].set_visible(False)
+    axs[n].spines['left'].set_visible(False)
+    axs[n].spines['right'].set_visible(False)
 
 
 #####################################################################
