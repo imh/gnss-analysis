@@ -17,6 +17,8 @@ have explicit GPS times.
 
 from gnss_analysis.stats_utils import truthify
 from gnss_analysis.tools.records2table import hdf5_write
+from pandas.tslib import Timestamp, Timedelta
+import datetime
 import fnmatch
 import gnss_analysis.locations as loc
 import matplotlib.pyplot as plt
@@ -362,6 +364,16 @@ def mark_dgnss_baseline_warning(t):
   return prefix_match_text(t.rover_logs, "WARNING: dgnss_baseline")
 
 
+def mark_ephemeris_diffs(ephemerides):
+  ts = []
+  for sat in ephemerides.items:
+    diff = ephemerides[sat, :, :].T.dropna().diff()
+    d = diff.T.drop(['host_offset', 'host_time', 'approx_gps_time']).T
+    mask = d[(d.T != 0).any()].dropna()
+    ts.append(ephemerides[sat, :, :].T.dropna().ix[mask.index.values])
+  return pd.concat(ts).set_index('approx_gps_time').sort_index()
+
+
 #####################################################################
 ## Plotting stuff
 
@@ -512,7 +524,8 @@ class Plotter(object):
     """
     """
     # Setup annotations
-    anns = [('log_flash', mark_flash_saves(self.hitl_log)['text']),
+    anns = [('logs', self.hitl_log.rover_logs.T['text']),
+            ('log_flash', mark_flash_saves(self.hitl_log)['text']),
             ('log_trusted_eph', mark_new_trusted_ephs(self.hitl_log)['text']),
             ('log_new_untrusted_ephs', mark_new_untrusted_ephs(self.hitl_log)['text']),
             ('log_pvt', mark_pvt_warning(self.hitl_log)['text']),
@@ -533,8 +546,9 @@ class Plotter(object):
             ('large_fixed_jump', mark_large_jumps(self.fixed, self.ref_rtk)),
             ('large_float_error', mark_large_position_errors(self.float_pos, self.ref_rtk)),
             ('large_float_jump', mark_large_jumps(self.float_pos, self.ref_rtk)),
-            ('large_spp_error', mark_large_position_errors(self.spp, self.ref_spp)),
-            ('large_spp_jump', mark_large_jumps(self.spp, self.ref_spp))
+            ('large_spp_error', mark_large_position_errors(self.spp, self.ref_spp, n=100)),
+            ('large_spp_jump', mark_large_jumps(self.spp, self.ref_spp, n=100)),
+            ('diff_ephemeris', mark_ephemeris_diffs(self.hitl_log.rover_ephemerides)['prn'])
            ]
     self.anns = dict(anns)
     if self.verbose:
@@ -567,7 +581,7 @@ class Plotter(object):
     n_plots = 1 + sum([int(not dat.truncate(i, j).empty) for (dat, t) in targets])
     if self.verbose:
       print "Number of plots %d between %s. and %s.\n" % (n_plots, i, j)
-    fig, axs = plt.subplots(n_plots, 1, figsize=(16, 4*n_plots), sharex=True)
+    fig, axs = plt.subplots(n_plots, 1, figsize=(16, 4*n_plots), sharex=False)
     n = 0
     for (dat, title) in targets:
       l = dat.truncate(i, j)
@@ -575,13 +589,14 @@ class Plotter(object):
         l.plot(ax=axs[n], title=title, marker='.')
         axs[n].get_xticklabels()[0].set_visible(True)
         axs[n].legend(loc='upper right')
+        axs[n].set_xlim(i, j)
         n += 1
-
     # Show annotations
     for plot_ann in plot_anns:
       if plot_ann not in self.anns:
         warnings.warn('Invalid key %s.' % plot_ann)
       elif not self.anns[plot_ann].empty:
+        self.anns[plot_ann] = self.anns[plot_ann].sort_index()
         g = self.anns[plot_ann][i:j]
         for ax in axs[:-1]:
           for v in g.index:
@@ -590,15 +605,18 @@ class Plotter(object):
           assert isinstance(self.anns[plot_ann], pd.Series), "Key %s not Series." % plot_ann
           s = "%s: %s" % (plot_ann, self.anns[plot_ann][k])
           axs[n].text(k, 1, s, rotation='vertical', fontsize=8)
-        if self.verbose:
+        if self.verbose and not g.empty:
           print "\n%s ------" % plot_ann
-          print self.anns[plot_ann]
+          print self.anns[plot_ann].truncate(i, j)
           print "------"
-
+    axs[-2].get_xaxis().set_visible(True)
     axs[n].set_title('Events')
     axs[n].spines['top'].set_visible(False)
     axs[n].spines['left'].set_visible(False)
     axs[n].spines['right'].set_visible(False)
+    start = self.index[self.index.searchsorted(i)]
+    end = self.index[self.index.searchsorted(j)]
+    axs[n].set_xlim(start, end)
 
 
 #####################################################################
@@ -617,7 +635,8 @@ def process_raw_log(date,
   path = local_dest + bucket_name + base_prefix + "/" + date
   new_files = []
   gps_time_tabs = ['rover_iar_state', 'rover_logs', 'rover_tracking',
-                   'rover_acq', 'rover_thread_state', 'rover_uart_state']
+                   'rover_acq', 'rover_thread_state', 'rover_uart_state',
+                   'rover_ephemerides', 'base_ephemerides']
   for root, dirnames, filenames in os.walk(path):
     for filename in fnmatch.filter(filenames, 'serial*.json'):
       if verbose:

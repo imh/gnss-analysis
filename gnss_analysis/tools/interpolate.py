@@ -49,7 +49,8 @@ def main():
                       action='store_true',
                       help='Verbose output.')
   gps_time_tabs = ['rover_iar_state', 'rover_logs', 'rover_tracking',
-                   'rover_acq', 'rover_thread_state', 'rover_uart_state']
+                   'rover_acq', 'rover_thread_state', 'rover_uart_state',
+                   'rover_ephemerides', 'base_ephemerides']
   # TODO (Buro): Add in handling for explicit overwrites. Currently,
   # this will fill in and overwrite (specifically sdiffs, etc.) that
   # you might have.
