@@ -357,6 +357,11 @@ def mark_hardfaults(t):
 def mark_watchdog_reset(t):
   return prefix_match_text(t.rover_logs, "ERROR: Piksi has reset due to a watchdog timeout")
 
+
+def mark_dgnss_baseline_warning(t):
+  return prefix_match_text(t.rover_logs, "WARNING: dgnss_baseline")
+
+
 #####################################################################
 ## Plotting stuff
 
@@ -521,6 +526,7 @@ class Plotter(object):
             ('log_hardfault', mark_hardfaults(self.hitl_log)['text']),
             ('log_hardfault_unique', mark_hardfaults(self.hitl_log)['text']),
             ('log_watchdog', mark_watchdog_reset(self.hitl_log)['text']),
+            ('log_dgnss_warnings', mark_dgnss_baseline_warning(self.hitl_log)['text']),
             ('fixed2float', mark_fixed2float(self.hitl_log)['flags']),
             ('obs_gaps', mark_obs_gaps(self.hitl_log)),
             ('large_fixed_error', mark_large_position_errors(self.fixed, self.ref_rtk)),
@@ -566,7 +572,7 @@ class Plotter(object):
     for (dat, title) in targets:
       l = dat.truncate(i, j)
       if not l.empty:
-        l.plot(ax=axs[n], title=title)
+        l.plot(ax=axs[n], title=title, marker='.')
         axs[n].get_xticklabels()[0].set_visible(True)
         axs[n].legend(loc='upper right')
         n += 1
