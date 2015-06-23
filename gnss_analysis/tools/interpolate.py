@@ -32,7 +32,7 @@ titled 'approx_gps_time'.
 
 """
 
-from gnss_analysis.tables import get_gps_time_col, reindex_tables
+from gnss_analysis.hitl_table_utils import get_gps_time_col, reindex_tables
 import pandas as pd
 
 def main():

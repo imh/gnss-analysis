@@ -15,7 +15,7 @@ utilities.
 """
 
 from pandas.tslib import Timestamp, Timedelta
-import gnss_analysis.tables as t
+import gnss_analysis.hitl_table_utils as t
 import numpy as np
 import os
 import pandas as pd

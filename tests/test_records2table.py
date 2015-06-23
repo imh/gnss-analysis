@@ -64,7 +64,7 @@ def test_hdf5():
                'host_offset': 58353.0,
                'host_time': 1426385006.0}}
     assert isinstance(store.ephemerides, pd.Panel)
-    assert store.ephemerides.shape == (2, 28, 3)
+    assert store.ephemerides.shape == (2, 29, 3)
     assert isinstance(store.rover_obs, pd.Panel)
     assert store.rover_obs.shape == (3, 6, 8)
     assert store.rover_obs[0, :, :].to_dict() \
