@@ -130,7 +130,7 @@ def run(hdf5_filename, known_baseline, reports=reports, baseline_is_NED=False):
   """
   data, rover_ecef_df, base_ecef_df = load_sdiffs_and_pos(hdf5_filename)
   if len(data.items) < 2:
-    raise Exception("Data must contain at least two observations.")
+    raise Exception("Data must contain at least two non nan observations.")
   # data = data.ix[:,:,[0,2,22,30,31]]
   first_datum = data.ix[1]
   data = data.ix[2:]

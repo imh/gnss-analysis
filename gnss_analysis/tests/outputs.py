@@ -13,7 +13,7 @@ from gnss_analysis.abstract_analysis.analysis import *
 from gnss_analysis.abstract_analysis.report import *
 import gnss_analysis.utils as ut
 import swiftnav.dgnss_management as mgmt
-
+import numpy as np
 
 class FloatBaselineA(Analysis):
   """
@@ -21,11 +21,14 @@ class FloatBaselineA(Analysis):
   """
 
   def __init__(self):
+    self.i = 0
     k = 'FloatBaseline'
     super(FloatBaselineA, self).__init__(key=k, keep_as_map=True)
 
   def compute(self, data, current_analyses, prev_fold, parameters):
     d = data.apply(ut.mk_swiftnav_sdiff, axis=0).dropna()
+    if len(d) < 4:
+      return np.array([np.nan, np.nan, np.nan])
     num_used, b = mgmt.dgnss_new_float_baseline(d, parameters.rover_ecef)
     return b
 
