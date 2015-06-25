@@ -69,6 +69,8 @@ class StoreToHDF5(object):
     self.base_obs = {}
     self.rover_obs = {}
     self.ephemerides = {}
+    self.rover_ephemerides = {}
+    self.base_ephemerides = {}
     self.rover_spp = {}
     self.rover_llh = {}
     self.rover_rtk_ned = {}
@@ -97,14 +99,22 @@ class StoreToHDF5(object):
 
   def _process_eph(self, host_offset, host_time, msg):
     if type(msg) is ob.MsgEphemeris or type(msg) is dep.MsgEphemerisDeprecated:
+      time = gpstime.gpst_components2datetime(msg.toe_wn, msg.toe_tow)
+      t = self.base_ephemerides if from_base(msg) else self.rover_ephemerides
+      m = exclude_fields(msg)
+      m.update({'host_offset': host_offset, 'host_time': host_time})
+      # For the moment, SITL and HITL analyses expect different
+      # formats of ephemerides tables. Keep both until everyone's
+      # migrated appropriately.
       if msg.healthy == 1 and msg.valid == 1:
-        time = gpstime.gpst_components2datetime(msg.toe_wn, msg.toe_tow)
-        m = exclude_fields(msg)
-        m.update({'host_offset': host_offset, 'host_time': host_time})
         if time in self.ephemerides:
           self.ephemerides[time].update({msg.prn: m})
         else:
           self.ephemerides[time] = {msg.prn: m}
+      if msg.prn in t:
+        t[msg.prn].update({host_offset: m})
+      else:
+        t[msg.prn] = {host_offset: m}
 
   def _process_pos(self, host_offset, host_time, msg):
     if type(msg) is nav.MsgGPSTime:
@@ -242,6 +252,8 @@ class StoreToHDF5(object):
     f.put('base_obs', pd.Panel(self.base_obs))
     f.put('rover_obs', pd.Panel(self.rover_obs))
     f.put('ephemerides', pd.Panel(self.ephemerides))
+    f.put('rover_ephemerides', pd.Panel(self.rover_ephemerides))
+    f.put('base_ephemerides', pd.Panel(self.base_ephemerides))
     f.put('rover_spp', pd.DataFrame(self.rover_spp))
     f.put('rover_llh', pd.DataFrame(self.rover_llh))
     f.put('rover_rtk_ned', pd.DataFrame(self.rover_rtk_ned))
