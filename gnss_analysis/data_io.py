@@ -96,6 +96,7 @@ def get_timed_ephs(filled_ephs, t):
     The most last ephemerises before t in filled_ephs.
 
   """
+
   ephs_before = filled_ephs[filled_ephs.items < t]
   if len(ephs_before.items) > 0:
     return ephs_before.ix[-1]
@@ -332,7 +333,7 @@ def compute_ecef(pseudoranges, dops, sat_poss, sat_vels, t):
     # instead of using either the corrected/raw for both corrected and raw.
     nms.append(NavigationMeasurement(pseudorange, pseudorange,
                                      np.nan, dop, dop, sat_pos, sat_vel,
-                                     np.nan, np.nan, gpst.tow, gpst.wn, sat))
+                                     np.nan, np.nan, gpst, sat, 1))
   return calc_PVT(nms).pos_ecef
 
 

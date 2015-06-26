@@ -60,6 +60,19 @@ time_fn = gpstime.gpst_components2datetime
 import warnings
 warnings.filterwarnings('ignore', category=pd.io.pytables.PerformanceWarning)
 
+def validate_obs(obs_dict):
+  bad_times = []
+  for time, obs in obs_dict.iteritems():
+    total = obs['total']
+    counts = obs['counts']
+    if counts != set(range(total)):
+      bad_times.append(time)
+    del obs['total']
+    del obs['counts']
+  for time in bad_times:
+    del obs_dict[time]
+
+
 class StoreToHDF5(object):
   """Stores observations as HDF5.
 
@@ -84,6 +97,8 @@ class StoreToHDF5(object):
   def _process_obs(self, host_offset, host_time, msg):
     if type(msg) is ob.MsgObs:
       time = time_fn(msg.header.t.wn, msg.header.t.tow / MSEC_TO_SECONDS)
+      count = 0x0F & msg.header.n_obs
+      total = msg.header.n_obs >> 4
       t = self.base_obs if from_base(msg) else self.rover_obs
       # Convert pseudorange, carrier phase to SI units.
       for o in msg.obs:
@@ -92,8 +107,9 @@ class StoreToHDF5(object):
         v.update({'host_offset': host_offset, 'host_time': host_time})
         if time in t:
           t[time].update({o.prn: v})
+          t[time].update({'counts':t[time]['counts'].union([count])})
         else:
-          t[time] = {o.prn: v}
+          t[time] = {o.prn: v, 'total': total, 'counts':set([count])}
 
   def _process_eph(self, host_offset, host_time, msg):
     if type(msg) is ob.MsgEphemeris or type(msg) is dep.MsgEphemerisDeprecated:
@@ -239,7 +255,9 @@ class StoreToHDF5(object):
       print "Unlinking %s, which already exists!" % filename
       os.unlink(filename)
     f = pd.HDFStore(filename, mode='w')
+    validate_obs(self.base_obs)
     f.put('base_obs', pd.Panel(self.base_obs))
+    validate_obs(self.rover_obs)
     f.put('rover_obs', pd.Panel(self.rover_obs))
     f.put('ephemerides', pd.Panel(self.ephemerides))
     f.put('rover_spp', pd.DataFrame(self.rover_spp))
