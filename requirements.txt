@@ -16,3 +16,7 @@ coverage
 pytest-cov
 pytest-xdist
 tox
+ipython-sql
+scikit-learn
+statsmodels
+scikits.statsmodels
