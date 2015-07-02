@@ -67,7 +67,9 @@ class StoreToHDF5(object):
 
   def __init__(self):
     self.base_obs = {}
+    self.base_obs_integrity = {}
     self.rover_obs = {}
+    self.rover_obs_integrity = {}
     self.ephemerides = {}
     self.rover_ephemerides = {}
     self.base_ephemerides = {}
@@ -86,7 +88,13 @@ class StoreToHDF5(object):
   def _process_obs(self, host_offset, host_time, msg):
     if type(msg) is ob.MsgObs:
       time = time_fn(msg.header.t.wn, msg.header.t.tow / MSEC_TO_SECONDS)
+      # n_obs is split bytewise between the total and the count (which message
+      # this is).
+      count = 0x0F & msg.header.n_obs
+      total = msg.header.n_obs >> 4
       t = self.base_obs if from_base(msg) else self.rover_obs
+      ti = self.base_obs_integrity if from_base(msg) else \
+           self.rover_obs_integrity
       # Convert pseudorange, carrier phase to SI units.
       for o in msg.obs:
         v = {'P': o.P / CM_TO_M, 'L': o.L.i + o.L.f / Q32_WIDTH,
@@ -96,6 +104,14 @@ class StoreToHDF5(object):
           t[time].update({o.prn: v})
         else:
           t[time] = {o.prn: v}
+        # Set the 'counts' field such that the Nth bit is 1 iff we have
+        # received a message whose 'count' field (the first byte of the n_obs
+        # field) is N. If we have gotten them all, counts should be
+        # (1 << total) - 1, and python makes the numbers really big as needed.
+        if time in ti:
+          ti[time].update({'counts':ti[time]['counts'] | 1 << count})
+        else:
+          ti[time] = {'total': total, 'counts':1 << count}
 
   def _process_eph(self, host_offset, host_time, msg):
     if type(msg) is ob.MsgEphemeris or type(msg) is dep.MsgEphemerisDeprecated:
@@ -250,7 +266,9 @@ class StoreToHDF5(object):
       os.unlink(filename)
     f = pd.HDFStore(filename, mode='w')
     f.put('base_obs', pd.Panel(self.base_obs))
+    f.put('base_obs_integrity', pd.DataFrame(self.base_obs_integrity))
     f.put('rover_obs', pd.Panel(self.rover_obs))
+    f.put('rover_obs_integrity', pd.DataFrame(self.rover_obs_integrity))
     f.put('ephemerides', pd.Panel(self.ephemerides))
     f.put('rover_ephemerides', pd.Panel(self.rover_ephemerides))
     f.put('base_ephemerides', pd.Panel(self.base_ephemerides))

@@ -11,8 +11,23 @@
 
 from gnss_analysis.abstract_analysis.analysis import *
 from gnss_analysis.abstract_analysis.report import *
+import numpy as np
 import gnss_analysis.utils as ut
 import swiftnav.dgnss_management as mgmt
+from swiftnav.dgnss_management import AmbiguityState
+
+class AmbiguityStateA(Analysis):
+  """
+  The current AmbiguityState from dgnss_management.
+  """
+  def __init__(self):
+    k = 'AmbiguityState'
+    super(AmbiguityStateA, self).__init__(key=k, keep_as_fold=True)
+
+  def compute(self, data, current_analyses, prev_fold, parameters):
+    a = AmbiguityState()
+    mgmt.dgnss_update_ambiguity_state(a)
+    return a
 
 
 class FloatBaselineA(Analysis):
@@ -22,11 +37,14 @@ class FloatBaselineA(Analysis):
 
   def __init__(self):
     k = 'FloatBaseline'
-    super(FloatBaselineA, self).__init__(key=k, keep_as_map=True)
+    super(FloatBaselineA, self).__init__(key=k, keep_as_map=True,
+      parents=set([AmbiguityStateA()]))
 
   def compute(self, data, current_analyses, prev_fold, parameters):
     d = data.apply(ut.mk_swiftnav_sdiff, axis=0).dropna()
-    num_used, b = mgmt.dgnss_new_float_baseline(d, parameters.rover_ecef)
+    flag, _, b = mgmt.dgnss_float_baseline(d, parameters.rover_ecef, current_analyses['AmbiguityState'])
+    if flag != 0:
+      return np.array([np.nan, np.nan, np.nan])
     return b
 
 
@@ -51,11 +69,14 @@ class FixedBaselineA(Analysis):
 
   def __init__(self):
     k = 'FixedBaseline'
-    super(FixedBaselineA, self).__init__(key=k, keep_as_map=True)
+    super(FixedBaselineA, self).__init__(key=k, keep_as_map=True,
+      parents=set([AmbiguityStateA()]))
 
   def compute(self, data, current_analyses, prev_fold, parameters):
     d = data.apply(ut.mk_swiftnav_sdiff, axis=0).dropna()
-    num_used, b = mgmt.dgnss_fixed_baseline(d, parameters.rover_ecef)
+    flag, _, b = mgmt.dgnss_fixed_baseline(d, parameters.rover_ecef, current_analyses['AmbiguityState'])
+    if flag != 0:
+      return np.array([np.nan, np.nan, np.nan])
     return b
 
 
