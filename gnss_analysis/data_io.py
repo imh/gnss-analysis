@@ -96,7 +96,6 @@ def get_timed_ephs(filled_ephs, t):
     The most last ephemerises before t in filled_ephs.
 
   """
-
   ephs_before = filled_ephs[filled_ephs.items < t]
   if len(ephs_before.items) > 0:
     return ephs_before.ix[-1]
@@ -331,6 +330,8 @@ def compute_ecef(pseudoranges, dops, sat_poss, sat_vels, t):
     sat_vel = sat_vels[sat]
     # TODO, make one of the pseudoranges/dops NaN or actually input and use it,
     # instead of using either the corrected/raw for both corrected and raw.
+    # The magic number 1 is because the constructor needs an integer so can't
+    # be NaN. We don't need that field so it can be anything.
     nms.append(NavigationMeasurement(pseudorange, pseudorange,
                                      np.nan, dop, dop, sat_pos, sat_vel,
                                      np.nan, np.nan, gpst, sat, 1))
