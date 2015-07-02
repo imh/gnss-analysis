@@ -342,7 +342,9 @@ def load_sdiffs_and_pos(data_filename,
                         key_eph='ephemerides',
                         key_rover='rover_obs',
                         key_base='base_obs',
+                        key_base_integrity='base_obs_integrity',
                         key_rover_ecef='rover_spp',
+                        key_rover_integrity='rover_obs_integrity',
                         key_base_ecef='base_spp',
                         key_sdiff='sdiffs',
                         overwrite=False):
@@ -383,8 +385,14 @@ def load_sdiffs_and_pos(data_filename,
   if overwrite or not ('/' + key_sdiff) in s.keys() \
                or not ('/' + key_rover_ecef) in s.keys() \
                or not ('/' + key_base_ecef) in s.keys():
+    bi = s[key_base_integrity]
+    base_obs_good = bi.ix['counts']+1 == np.left_shift(1, bi.ix['total'])
+    ri = s[key_rover_integrity]
+    rover_obs_good = ri.ix['counts']+1 == np.left_shift(1, ri.ix['total'])
     s[key_sdiff], s[key_rover_ecef], s[key_base_ecef] = \
-      mk_sdiffs_and_abs_pos(s[key_eph], s[key_rover], s[key_base])
+      mk_sdiffs_and_abs_pos(s[key_eph],
+                            s[key_rover].ix[rover_obs_good],
+                            s[key_base].ix[base_obs_good])
     # If a DataFrame of SingleDiffs is desired, use .apply(construct_pyobj_sdiff, axis=1).T
   sd = s[key_sdiff]
   rover_ecef = s[key_rover_ecef]

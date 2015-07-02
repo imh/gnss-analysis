@@ -60,19 +60,6 @@ time_fn = gpstime.gpst_components2datetime
 import warnings
 warnings.filterwarnings('ignore', category=pd.io.pytables.PerformanceWarning)
 
-def validate_obs(obs_dict):
-  bad_times = []
-  for time, obs in obs_dict.iteritems():
-    total = obs['total']
-    counts = obs['counts']
-    if counts != set(range(total)):
-      bad_times.append(time)
-    del obs['total']
-    del obs['counts']
-  for time in bad_times:
-    del obs_dict[time]
-
-
 class StoreToHDF5(object):
   """Stores observations as HDF5.
 
@@ -80,7 +67,9 @@ class StoreToHDF5(object):
 
   def __init__(self):
     self.base_obs = {}
+    self.base_obs_integrity = {}
     self.rover_obs = {}
+    self.rover_obs_integrity = {}
     self.ephemerides = {}
     self.rover_spp = {}
     self.rover_llh = {}
@@ -97,9 +86,13 @@ class StoreToHDF5(object):
   def _process_obs(self, host_offset, host_time, msg):
     if type(msg) is ob.MsgObs:
       time = time_fn(msg.header.t.wn, msg.header.t.tow / MSEC_TO_SECONDS)
+      # n_obs is split bytewise between the total and the count (which message
+      # this is).
       count = 0x0F & msg.header.n_obs
       total = msg.header.n_obs >> 4
       t = self.base_obs if from_base(msg) else self.rover_obs
+      ti = self.base_obs_integrity if from_base(msg) else \
+           self.rover_obs_integrity
       # Convert pseudorange, carrier phase to SI units.
       for o in msg.obs:
         v = {'P': o.P / CM_TO_M, 'L': o.L.i + o.L.f / Q32_WIDTH,
@@ -107,9 +100,16 @@ class StoreToHDF5(object):
         v.update({'host_offset': host_offset, 'host_time': host_time})
         if time in t:
           t[time].update({o.prn: v})
-          t[time].update({'counts':t[time]['counts'].union([count])})
         else:
-          t[time] = {o.prn: v, 'total': total, 'counts':set([count])}
+          t[time] = {o.prn: v}
+        # Set the 'counts' field such that the Nth bit is 1 iff we have
+        # received a message whose 'count' field (the first byte of the n_obs
+        # field) is N. If we have gotten them all, counts should be
+        # (1 << total) - 1, and python makes the numbers really big as needed.
+        if time in ti:
+          ti[time].update({'counts':ti[time]['counts'] | 1 << count})
+        else:
+          ti[time] = {'total': total, 'counts':1 << count}
 
   def _process_eph(self, host_offset, host_time, msg):
     if type(msg) is ob.MsgEphemeris or type(msg) is dep.MsgEphemerisDeprecated:
@@ -255,10 +255,10 @@ class StoreToHDF5(object):
       print "Unlinking %s, which already exists!" % filename
       os.unlink(filename)
     f = pd.HDFStore(filename, mode='w')
-    validate_obs(self.base_obs)
     f.put('base_obs', pd.Panel(self.base_obs))
-    validate_obs(self.rover_obs)
+    f.put('base_obs_integrity', pd.DataFrame(self.base_obs_integrity))
     f.put('rover_obs', pd.Panel(self.rover_obs))
+    f.put('rover_obs_integrity', pd.DataFrame(self.rover_obs_integrity))
     f.put('ephemerides', pd.Panel(self.ephemerides))
     f.put('rover_spp', pd.DataFrame(self.rover_spp))
     f.put('rover_llh', pd.DataFrame(self.rover_llh))
