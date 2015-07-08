@@ -364,6 +364,26 @@ def mark_dgnss_baseline_warning(t):
   return prefix_match_text(t.rover_logs, "WARNING: dgnss_baseline")
 
 
+def mark_old_ephemeris(t):
+  return prefix_match_text(t.rover_logs, "WARNING: Using ephemeris older")
+
+
+def mark_prn_tow_mismatch(t):
+  return prefix_match_text(t.rover_logs, r'WARNING: PRN \d+ TOW mismatch')
+
+
+def mark_null_acq_snr(t):
+  return prefix_match_text(t.rover_logs, r'INFO: acq: PRN \d+ found @ 0 Hz, 0 SNR')
+
+
+def mark_no_channels_free(t):
+  return prefix_match_text(t.rover_logs, r'INFO: No channels free')
+
+
+def mark_false_phase_lock(t):
+  return prefix_match_text(t.rover_logs, r'WARNING: False phase lock')
+
+
 def mark_ephemeris_diffs(ephemerides):
   ts = []
   for sat in ephemerides.items:
@@ -372,6 +392,12 @@ def mark_ephemeris_diffs(ephemerides):
     mask = d[(d.T != 0).any()].dropna()
     ts.append(ephemerides[sat, :, :].T.dropna().ix[mask.index.values])
   return pd.concat(ts).set_index('approx_gps_time').sort_index()
+
+
+def mark_lock_cnt_diff(obs):
+  df = obs[:, 'lock', :].T.diff()
+  s = np.sqrt(np.square(df).sum(axis=1))
+  return s[s > 0]
 
 
 #####################################################################
@@ -473,13 +499,26 @@ def build_thread_state(rover_log):
   return (cpus, stacks, list(rover_log.rover_thread_state.items))
 
 
-def plot_thread_state(cpus, stacks, threads, axs):
+def plot_thread_state(cpus, stacks, threads, axs, interval):
+  i, j = interval
   for thread in threads:
-    cpus[thread].plot(ax=axs[0], title="CPU thread usage", label=thread)
-  axs[0].legend(axs[0].get_lines(), threads, loc='upper right')
+    cpus[thread].truncate(i, j).plot(ax=axs[0],
+                                     title="CPU thread usage",
+                                     label=thread,
+                                     marker='.')
+  axs[0].legend(axs[0].get_lines(), threads,
+                loc='upper right',
+                prop={'size': 8})
+  axs[0].set_xlim(i, j)
   for thread in threads:
-    stacks[thread].plot(ax=axs[1], title="CPU stack usage", label=thread)
-  axs[1].legend(axs[1].get_lines(), threads, loc='upper right')
+    stacks[thread].truncate(i, j).plot(ax=axs[1],
+                                       title="CPU stack free",
+                                       label=thread,
+                                       marker='.')
+  axs[1].legend(axs[1].get_lines(), threads,
+                loc='upper right',
+                prop={'size': 8})
+  axs[1].set_xlim(i, j)
 
 
 class Plotter(object):
@@ -495,8 +534,8 @@ class Plotter(object):
     """
     """
     # Define start and end of time series around GPS observation SNR
-    self.base_cn0 = self.hitl_log.base_obs[:,'cn0',:].T
-    self.rover_cn0 = self.hitl_log.rover_obs[:,'cn0',:].T
+    self.base_cn0 = self.hitl_log.base_obs[:, 'cn0', :].T
+    self.rover_cn0 = self.hitl_log.rover_obs[:, 'cn0', :].T
     self.index = self.rover_cn0.index
     self.i = self.index[0]
     self.j = self.index[-1]
@@ -505,7 +544,7 @@ class Plotter(object):
     self.sdiff_L = get_sdiff('L', self.hitl_log.rover_obs, self.hitl_log.base_obs)
     self.ddiff_L = get_ddiff(get_ref_sat(self.sdiff_L), self.sdiff_L)
     self.sdiff_P = get_sdiff('P', self.hitl_log.rover_obs, self.hitl_log.base_obs)
-    self.ddiff_P = get_ddiff(get_ref_sat(self.sdiff_L), self.sdiff_L)
+    self.ddiff_P = get_ddiff(get_ref_sat(self.sdiff_P), self.sdiff_P)
     self.ddiff_L_t = get_ddiff_t(self.ddiff_L)
     self.ddiff_P_t = get_ddiff_t(self.ddiff_P)
     # Fixed and Float RTK solution
@@ -540,7 +579,10 @@ class Plotter(object):
             ('log_hardfault_unique', mark_hardfaults(self.hitl_log)['text']),
             ('log_watchdog', mark_watchdog_reset(self.hitl_log)['text']),
             ('log_dgnss_warnings', mark_dgnss_baseline_warning(self.hitl_log)['text']),
+            ('log_prn_tow_mismatch', mark_prn_tow_mismatch(self.hitl_log)['text']),
+            ('log_old_ephemeris', mark_old_ephemeris(self.hitl_log)['text']),
             ('fixed2float', mark_fixed2float(self.hitl_log)['flags']),
+            ('log_null_acq_snr', mark_null_acq_snr(self.hitl_log)['text']),
             ('obs_gaps', mark_obs_gaps(self.hitl_log)),
             ('large_fixed_error', mark_large_position_errors(self.fixed, self.ref_rtk)),
             ('large_fixed_jump', mark_large_jumps(self.fixed, self.ref_rtk)),
@@ -548,12 +590,17 @@ class Plotter(object):
             ('large_float_jump', mark_large_jumps(self.float_pos, self.ref_rtk)),
             ('large_spp_error', mark_large_position_errors(self.spp, self.ref_spp, n=100)),
             ('large_spp_jump', mark_large_jumps(self.spp, self.ref_spp, n=100)),
-            ('diff_ephemeris', mark_ephemeris_diffs(self.hitl_log.rover_ephemerides)['prn'])
+            ('diff_ephemeris', mark_ephemeris_diffs(self.hitl_log.rover_ephemerides)['prn']),
+            ('diff_rover_lock_cnt', mark_lock_cnt_diff(self.hitl_log.rover_obs)),
+            ('diff_base_lock_cnt', mark_lock_cnt_diff(self.hitl_log.base_obs)),
+            ('log_no_channels_free', mark_no_channels_free(self.hitl_log)['text']),
+            ('log_false_phase_lock', mark_false_phase_lock(self.hitl_log)['text'])
            ]
     self.anns = dict(anns)
+    sorted_anns = sorted(anns, key=lambda metric: len(metric[1]), reverse=True)
     if self.verbose:
       print "\n----- Annotations:"
-      for n, ann in self.anns.iteritems():
+      for n, ann in sorted_anns:
         print "{:22s} {:5d}".format(n, len(ann))
       print "-----\n"
     return self.anns
@@ -576,12 +623,14 @@ class Plotter(object):
                (self.ddiff_L_t, 'Smoothed DD Carrier Phase (cycles)'),
                (self.rover_cn0, 'HITL Rover Obs SNR'),
                (self.base_cn0, 'HITL Base Obs SNR'),
+               (self.sdiff_P, 'SD Pseudorange (m)'),
+               (self.ddiff_P_t, 'Smoothed DD Pseudorange (m)'),
                (self.iar_state, 'Rover IAR State (hypotheses)')
               ]
-    n_plots = 1 + sum([int(not dat.truncate(i, j).empty) for (dat, t) in targets])
+    n_plots = 1 + sum([int(not dat.truncate(i, j).empty) for (dat, t) in targets]) + 2
     if self.verbose:
       print "Number of plots %d between %s. and %s.\n" % (n_plots, i, j)
-    fig, axs = plt.subplots(n_plots, 1, figsize=(16, 4*n_plots), sharex=False)
+    fig, axs = plt.subplots(n_plots, 1, figsize=(16, 5*n_plots), sharex=False)
     n = 0
     for (dat, title) in targets:
       l = dat.truncate(i, j)
@@ -598,7 +647,7 @@ class Plotter(object):
       elif not self.anns[plot_ann].empty:
         self.anns[plot_ann] = self.anns[plot_ann].sort_index()
         g = self.anns[plot_ann][i:j]
-        for ax in axs[:-1]:
+        for ax in axs[:-3]:
           for v in g.index:
             ax.axvline(v, linewidth=1, color='black', alpha=0.6)
         for k in g.index:
@@ -609,7 +658,7 @@ class Plotter(object):
           print "\n%s ------" % plot_ann
           print self.anns[plot_ann].truncate(i, j)
           print "------"
-    axs[-2].get_xaxis().set_visible(True)
+    axs[-4].get_xaxis().set_visible(True)
     axs[n].set_title('Events')
     axs[n].spines['top'].set_visible(False)
     axs[n].spines['left'].set_visible(False)
@@ -617,6 +666,9 @@ class Plotter(object):
     start = self.index[self.index.searchsorted(i)]
     end = self.index[self.index.searchsorted(j)]
     axs[n].set_xlim(start, end)
+    # Plot CPU stuff
+    cpus, stacks, threads = build_thread_state(self.hitl_log)
+    plot_thread_state(cpus, stacks, threads, axs[-2:], interval=(i, j))
 
 
 #####################################################################
