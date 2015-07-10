@@ -217,6 +217,27 @@ def get_ref_sat(sdiff):
   return sdiff.count().argmax()
 
 
+def get_observed_refsats(obs):
+  """Returns an datetime index of observed satellites, based on
+  time-series diffs of the pseudoranges.
+
+  Parameters
+  ----------
+  obs : Pandas Panel of GPS observations.
+
+  Returns
+  -------
+  Series, keyed by Datetime and prn of ref sat
+
+  """
+  vals = {}
+  for sat, col in obs[:, 'P', :].T.diff().iteritems():
+    c = col.dropna()[col.dropna() == 0]
+    if not c.empty:
+      vals[c.first_valid_index()] = sat
+  return pd.Series(vals)
+
+
 def get_ddiff(ref_sat, sdiff):
   """Given a reference satellite and sdiff observations, returns double
   difference observations.
@@ -594,8 +615,9 @@ class Plotter(object):
             ('diff_rover_lock_cnt', mark_lock_cnt_diff(self.hitl_log.rover_obs)),
             ('diff_base_lock_cnt', mark_lock_cnt_diff(self.hitl_log.base_obs)),
             ('log_no_channels_free', mark_no_channels_free(self.hitl_log)['text']),
-            ('log_false_phase_lock', mark_false_phase_lock(self.hitl_log)['text'])
-           ]
+            ('log_false_phase_lock', mark_false_phase_lock(self.hitl_log)['text']),
+            ('obs_refsat_rover', get_observed_refsats(self.hitl_log.rover_obs)),
+            ('obs_refsat_base', get_observed_refsats(self.hitl_log.base_obs))]
     self.anns = dict(anns)
     sorted_anns = sorted(anns, key=lambda metric: len(metric[1]), reverse=True)
     if self.verbose:
