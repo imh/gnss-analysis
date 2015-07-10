@@ -534,8 +534,8 @@ class Plotter(object):
     """
     """
     # Define start and end of time series around GPS observation SNR
-    self.base_cn0 = self.hitl_log.base_obs[:, 'cn0', :].T
-    self.rover_cn0 = self.hitl_log.rover_obs[:, 'cn0', :].T
+    self.base_cn0 = self.hitl_log.base_obs[:, 'cn0', :].T/4.
+    self.rover_cn0 = self.hitl_log.rover_obs[:, 'cn0', :].T/4.
     self.index = self.rover_cn0.index
     self.i = self.index[0]
     self.j = self.index[-1]
@@ -615,9 +615,10 @@ class Plotter(object):
     # Plot stuff
     targets = [(self.fixed, 'HITL Fixed Soln (meters/NED)'),
                (self.fixed_r, 'HITL Fixed Soln Magnitude Error (meters/NED)'),
-               (self.fixed_r[self.fixed_r < 1500], 'HITL Fixed Soln Magnitude Error (below 1000m) (meters/NED)'),
+               (self.fixed_r[self.fixed_r < 1500], 'HITL Fixed Soln Magnitude Error (below 1500m) (meters/NED)'),
                (self.float_pos, 'HITL Float Soln (meters/NED)'),
-               (self.float_r[self.float_r < 1500], 'HITL Float Magnitude Error (meters/NED)'),
+               (self.float_r, 'HITL Float Magnitude Error (meters/NED)'),
+               (self.float_r[self.float_r < 1500], 'HITL Float Magnitude Error (below 1500m) (meters/NED)'),
                (self.spp_r, 'HITL SPP Soln Error (meters/ECEF)'),
                (self.sdiff_L, 'SD Carrier Phase (cycles)'),
                (self.ddiff_L_t, 'Smoothed DD Carrier Phase (cycles)'),
