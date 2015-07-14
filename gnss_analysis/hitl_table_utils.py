@@ -281,6 +281,9 @@ def get_rtk_float(t):
 def get_spp(t):
   return t.rover_spp.T[['x', 'y', 'z']]
 
+def get_nsats(t):
+  return t.rover_rtk_ned.T[t.rover_rtk_ned.T['flags'] == 0][['n', 'e', 'd']]
+
 
 def get_distances(df, loc):
   return np.sqrt(np.square(df - loc).sum(axis=1))
