@@ -44,7 +44,6 @@ import pandas as pd
 import sbp.acquisition as acq
 import sbp.navigation as nav
 import sbp.observation as ob
-import sbp.deprecated as dep
 import sbp.piksi as piksi
 import sbp.tracking as tr
 import sbp.logging as lg
@@ -86,7 +85,7 @@ class StoreToHDF5(object):
     self.time = None
 
   def _process_obs(self, host_offset, host_time, msg):
-    if type(msg) is ob.MsgObs:
+    if type(msg) in [ob.MsgObs, ob.MsgObsDepA]:
       time = time_fn(msg.header.t.wn, msg.header.t.tow / MSEC_TO_SECONDS)
       # n_obs is split bytewise between the total and the count (which message
       # this is).
@@ -97,13 +96,14 @@ class StoreToHDF5(object):
            self.rover_obs_integrity
       # Convert pseudorange, carrier phase to SI units.
       for o in msg.obs:
+        prn = o.sid if msg.msg_type is ob.SBP_MSG_OBS else o.prn
         v = {'P': o.P / CM_TO_M, 'L': o.L.i + o.L.f / Q32_WIDTH,
              'cn0': o.cn0, 'lock': o.lock}
         v.update({'host_offset': host_offset, 'host_time': host_time})
         if time in t:
-          t[time].update({o.prn: v})
+          t[time].update({prn: v})
         else:
-          t[time] = {o.prn: v}
+          t[time] = {prn: v}
         # Set the 'counts' field such that the Nth bit is 1 iff we have
         # received a message whose 'count' field (the first byte of the n_obs
         # field) is N. If we have gotten them all, counts should be
@@ -114,7 +114,9 @@ class StoreToHDF5(object):
           ti[time] = {'total': total, 'counts':1 << count}
 
   def _process_eph(self, host_offset, host_time, msg):
-    if type(msg) is ob.MsgEphemeris or type(msg) is dep.MsgEphemerisDeprecated:
+    if type(msg) in [ob.MsgEphemeris,
+                     ob.MsgEphemerisDepA,
+                     ob.MsgEphemerisDepB]:
       time = gpstime.gpst_components2datetime(msg.toe_wn, msg.toe_tow)
       t = self.base_ephemerides if from_base(msg) else self.rover_ephemerides
       m = exclude_fields(msg)
@@ -122,6 +124,7 @@ class StoreToHDF5(object):
       # For the moment, SITL and HITL analyses expect different
       # formats of ephemerides tables. Keep both until everyone's
       # migrated appropriately.
+      prn = msg.sid if msg.msg_type is ob.SBP_MSG_EPHEMERIS else msg.prn
       if msg.healthy == 1 and msg.valid == 1:
         if time in self.ephemerides:
           self.ephemerides[time].update({msg.prn: m})
@@ -162,18 +165,19 @@ class StoreToHDF5(object):
         self.rover_rtk_ecef[time] = m
 
   def _process_tracking(self, host_offset, host_time, msg):
-    if type(msg) is tr.MsgTrackingState:
+    if type(msg) in [tr.MsgTrackingState, tr.MsgTrackingStateDepA]:
       m = exclude_fields(msg)
       # Flatten a bit: reindex at the top level by prn and remove the
       # 'states' field from the message.
       for s in msg.states:
         d = walk_json_dict(s)
+        prn = s.sid if msg.msg_type is tr.SBP_MSG_TRACKING_STATE else s.prn
         d['host_offset'] = host_offset
         d['host_time'] = host_time
         if s.prn in self.rover_tracking:
-          self.rover_tracking[s.prn].update({host_offset: d})
+          self.rover_tracking[prn].update({host_offset: d})
         else:
-          self.rover_tracking[s.prn] = {host_offset: d}
+          self.rover_tracking[prn] = {host_offset: d}
       del m['states']
 
   def _process_iar(self, host_offset, host_time, msg):
@@ -227,14 +231,15 @@ class StoreToHDF5(object):
         self.rover_uart_state['latency'] = {host_offset: l}
 
   def _process_acq(self, host_offset, host_time, msg):
-    if type(msg) is acq.MsgAcqResult:
+    if type(msg) in [acq.MsgAcqResult, acq.MsgAcqResultDepA]:
+      prn = msg.sid if msg.msg_type is acq.SBP_MSG_ACQ_RESULT else msg.prn
       m = exclude_fields(msg)
       m['host_offset'] = host_offset
       m['host_time'] = host_time
-      if m['prn'] in self.rover_acq:
-        self.rover_acq[m['prn']].update({host_offset: m})
+      if prn in self.rover_acq:
+        self.rover_acq[prn].update({host_offset: m})
       else:
-        self.rover_acq[m['prn']] = {host_offset: m}
+        self.rover_acq[prn] = {host_offset: m}
 
   def process_message(self, host_offset, host_time, msg):
     """Dispatches specific message types to the appropriate
