@@ -25,6 +25,8 @@ following:
 <class 'pandas.io.pytables.HDFStore'>
 File path: data/serial-link-20150506-175750.log.json.fake.hdf5
 /base_obs                   wide         (shape->[6948,6,9])
+/base_ephemerides           wide         (shape->[1,28,10])
+/rover_ephemerides          wide         (shape->[1,28,10])
 /ephemerides                wide         (shape->[1,28,10])
 /rover_iar_state            frame        (shape->[3,1487])
 /rover_logs                 frame        (shape->[1,3907])
@@ -59,6 +61,10 @@ time_fn = gpstime.gpst_components2datetime
 import warnings
 warnings.filterwarnings('ignore', category=pd.io.pytables.PerformanceWarning)
 
+# MsgPrints and MsgEphemeris sometimes coincide in time, so add a
+# deterministic sequence count offset for each run of coincident logs.
+SEQ_INTERVAL = 0.05
+
 class StoreToHDF5(object):
   """Stores observations as HDF5.
 
@@ -72,6 +78,7 @@ class StoreToHDF5(object):
     self.ephemerides = {}
     self.rover_ephemerides = {}
     self.base_ephemerides = {}
+    self.eph_seq = 0
     self.rover_spp = {}
     self.rover_llh = {}
     self.rover_rtk_ned = {}
@@ -82,6 +89,7 @@ class StoreToHDF5(object):
     self.rover_thread_state = {}
     self.rover_uart_state = {}
     self.rover_acq = {}
+    self.log_seq = 0
     self.time = None
 
   def _process_obs(self, host_offset, host_time, msg):
@@ -111,7 +119,7 @@ class StoreToHDF5(object):
         if time in ti:
           ti[time].update({'counts':ti[time]['counts'] | 1 << count})
         else:
-          ti[time] = {'total': total, 'counts':1 << count}
+          ti[time] = {'total': total, 'counts': 1 << count}
 
   def _process_eph(self, host_offset, host_time, msg):
     if type(msg) in [ob.MsgEphemeris,
@@ -119,21 +127,23 @@ class StoreToHDF5(object):
                      ob.MsgEphemerisDepB]:
       time = gpstime.gpst_components2datetime(msg.toe_wn, msg.toe_tow)
       t = self.base_ephemerides if from_base(msg) else self.rover_ephemerides
+      prn = msg.sid if msg.msg_type is ob.SBP_MSG_EPHEMERIS else msg.prn
       m = exclude_fields(msg)
-      m.update({'host_offset': host_offset, 'host_time': host_time})
+      m['host_time'] = host_time
+      self.eph_seq = self.eph_seq + 1 if host_offset in self.ephemerides else 0
+      m['host_offset'] = host_offset + SEQ_INTERVAL*self.eph_seq
       # For the moment, SITL and HITL analyses expect different
       # formats of ephemerides tables. Keep both until everyone's
       # migrated appropriately.
-      prn = msg.sid if msg.msg_type is ob.SBP_MSG_EPHEMERIS else msg.prn
       if msg.healthy == 1 and msg.valid == 1:
         if time in self.ephemerides:
-          self.ephemerides[time].update({msg.prn: m})
+          self.ephemerides[time].update({prn: m})
         else:
-          self.ephemerides[time] = {msg.prn: m}
-      if msg.prn in t:
-        t[msg.prn].update({host_offset: m})
+          self.ephemerides[time] = {prn: m}
+      if prn in t:
+        t[prn].update({m['host_offset']: m})
       else:
-        t[msg.prn] = {host_offset: m}
+        t[prn] = {m['host_offset']: m}
 
   def _process_pos(self, host_offset, host_time, msg):
     if type(msg) is nav.MsgGPSTime:
@@ -190,9 +200,10 @@ class StoreToHDF5(object):
   def _process_log(self, host_offset, host_time, msg):
     if type(msg) is lg.MsgPrint:
       m = exclude_fields(msg)
-      m['host_offset'] = host_offset
+      self.log_seq = self.log_seq + 1 if host_offset in self.rover_logs else 0
+      m['host_offset'] = host_offset + SEQ_INTERVAL*self.log_seq
       m['host_time'] = host_time
-      self.rover_logs[host_offset] = m
+      self.rover_logs[m['host_offset']] = m
 
   def _process_thread_state(self, host_offset, host_time, msg):
     if type(msg) is piksi.MsgThreadState:

@@ -340,7 +340,7 @@ def mark_new_untrusted_ephs(t):
 
 
 def mark_pvt_warning(t):
-  return prefix_match_text(t.rover_logs, "WARNING: PVT warning")
+  return prefix_match_text(t.rover_logs, "WARNING: PVT")
 
 
 def mark_soln_deadline(t):
@@ -406,6 +406,38 @@ def mark_no_channels_free(t):
 
 def mark_false_phase_lock(t):
   return prefix_match_text(t.rover_logs, r'WARNING: False phase lock')
+
+
+def mark_subframe_mismatch(t):
+  return prefix_match_text(t.rover_logs, r'INFO: subframe parity mismatch')
+
+
+def mark_nav_phase_flip(t):
+  return prefix_match_text(t.rover_logs, r'INFO: Nav phase flip')
+
+
+def mark_int_time_increase(t):
+  return prefix_match_text(t.rover_logs, r'INFO: Increasing integration time')
+
+
+def mark_weird(t):
+  return prefix_match_text(t.rover_logs, "INFO: IAR: \d+WARNING:")
+
+
+def mark_weird(t):
+  return prefix_match_text(t.rover_logs, "INFO: IAR: \d+WARNING:")
+
+
+def mark_dgnss_update_warn(t):
+  return prefix_match_text(t.rover_logs, "WARNING: dgnss_update")
+
+
+def mark_base_soln_warn(t):
+  return prefix_match_text(t.rover_logs, "WARNING: Error calculating base station position")
+
+
+def mark_packet_drop(t):
+  return prefix_match_text(t.rover_logs, "INFO: Dropped one of the observation packets")
 
 
 def mark_ephemeris_diffs(ephemerides):
@@ -662,7 +694,14 @@ class Plotter(object):
             ('log_no_channels_free', mark_no_channels_free(self.hitl_log)['text']),
             ('log_false_phase_lock', mark_false_phase_lock(self.hitl_log)['text']),
             ('obs_refsat_rover', get_observed_refsats(self.hitl_log.rover_obs)),
-            ('obs_refsat_base', get_observed_refsats(self.hitl_log.base_obs))]
+            ('obs_refsat_base', get_observed_refsats(self.hitl_log.base_obs)),
+            ('mark_subframe_mismatch',  mark_subframe_mismatch(self.hitl_log)['text']),
+            ('mark_nav_phase_flip', mark_nav_phase_flip(self.hitl_log)['text']),
+            ('mark_int_time_increase', mark_int_time_increase(self.hitl_log)['text']),
+            ('mark_weird', mark_weird(self.hitl_log)['text']),
+            ('mark_dgnss_update_warn', mark_dgnss_update_warn(self.hitl_log)['text']),
+            ('mark_packet_drop', mark_packet_drop(self.hitl_log)['text']),
+            ('mark_base_soln_warn', mark_base_soln_warn(self.hitl_log)['text'])]
     self.anns = dict(anns)
     sorted_anns = sorted(anns, key=lambda metric: len(metric[1]), reverse=True)
     if self.verbose:
