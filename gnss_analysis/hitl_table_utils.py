@@ -746,11 +746,15 @@ class Plotter(object):
 
 DEFAULT_SWIFT_TMP_DIR = os.getenv('SWIFT_TMP',
                                   os.path.expanduser("~") + '/swift_tmp/s3/')
+# S3 bucket for static roof antenna test from Spring/Summer 2015.
+STATIC_TEST_S3_BUCKET = 'jenkins-backups-yz0bhivofjsjaieaebquxp'
+# S3 bucket for satdrop test from roof antenna on Summer 2015.
+SATDROP_S3_BUCKET = 'jenkins-backups-hitl-dynamics-phodpebmybrivnvfvt'
 
 def process_raw_log(date,
+                    bucket_name=STATIC_TEST_S3_BUCKET,
                     local_dest=DEFAULT_SWIFT_TMP_DIR,
                     verbose=False):
-  bucket_name = 'jenkins-backups-yz0bhivofjsjaieaebquxp'
   base_prefix = '/builds/'
   path = local_dest + bucket_name + base_prefix + "/" + date
   new_files = []
@@ -775,6 +779,7 @@ def process_raw_log(date,
 
 
 def get_from_s3(date,
+                bucket_name=STATIC_TEST_S3_BUCKET,
                 local_dest=DEFAULT_SWIFT_TMP_DIR,
                 access_key=os.getenv('AWS_ACCESS_KEY_ID', None),
                 secret_key=os.getenv('AWS_SECRET_ACCESS_KEY', None),
@@ -784,11 +789,14 @@ def get_from_s3(date,
   from boto.s3.connection import S3Connection
   from boto.s3.key import Key
   from itertools import groupby
-  bucket_name = 'jenkins-backups-yz0bhivofjsjaieaebquxp'
   base_prefix = 'builds/'
   bucket = S3Connection(access_key, secret_key).get_bucket(bucket_name)
   if verbose:
     print "Attempting to download dated log %s from S3:\n\n" % date
+  if not list(bucket.list(prefix=base_prefix + date)):
+    if verbose:
+      print "No %s found in S3 bucket %s." % (date, bucket_name)
+    return None
   for key in bucket.list(prefix=base_prefix + date):
       path = local_dest + bucket_name + "/" + key.name
       if not os.path.exists(os.path.dirname(path)):
