@@ -665,6 +665,7 @@ class Plotter(object):
     """
     """
     # Setup annotations
+    prn = 'sid' if 'sid' in self.hitl_log.rover_ephemerides.major_axis else 'prn'
     anns = [('logs', self.hitl_log.rover_logs.T['text']),
             ('log_flash', mark_flash_saves(self.hitl_log)['text']),
             ('log_trusted_eph', mark_new_trusted_ephs(self.hitl_log)['text']),
@@ -692,7 +693,7 @@ class Plotter(object):
             ('large_float_jump', mark_large_jumps(self.float_pos, self.ref_rtk)),
             ('large_spp_error', mark_large_position_errors(self.spp, self.ref_spp, n=100)),
             ('large_spp_jump', mark_large_jumps(self.spp, self.ref_spp, n=100)),
-            ('diff_ephemeris', mark_ephemeris_diffs(self.hitl_log.rover_ephemerides)['prn']),
+            ('diff_ephemeris', mark_ephemeris_diffs(self.hitl_log.rover_ephemerides)[prn]),
             ('diff_rover_lock_cnt', mark_lock_cnt_diff(self.hitl_log.rover_obs)),
             ('diff_base_lock_cnt', mark_lock_cnt_diff(self.hitl_log.base_obs)),
             ('log_no_channels_free', mark_no_channels_free(self.hitl_log)['text']),
