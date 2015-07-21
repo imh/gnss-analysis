@@ -405,7 +405,7 @@ def mark_no_channels_free(t):
 
 
 def mark_false_phase_lock(t):
-  return prefix_match_text(t.rover_logs, r'WARNING: False phase lock')
+  return prefix_match_text(t.rover_logs, r'INFO: False phase lock')
 
 
 def mark_subframe_mismatch(t):
@@ -438,6 +438,10 @@ def mark_base_soln_warn(t):
 
 def mark_packet_drop(t):
   return prefix_match_text(t.rover_logs, "INFO: Dropped one of the observation packets")
+
+
+def mark_sat_mask(t):
+  return prefix_match_text(t.rover_logs, "INFO: Mask")
 
 
 def mark_ephemeris_diffs(ephemerides):
@@ -701,7 +705,7 @@ class Plotter(object):
             ('mark_weird', mark_weird(self.hitl_log)['text']),
             ('mark_dgnss_update_warn', mark_dgnss_update_warn(self.hitl_log)['text']),
             ('mark_packet_drop', mark_packet_drop(self.hitl_log)['text']),
-            ('mark_base_soln_warn', mark_base_soln_warn(self.hitl_log)['text'])]
+            ('mark_sat_mask', mark_sat_mask(self.hitl_log)['text'])]
     self.anns = dict(anns)
     sorted_anns = sorted(anns, key=lambda metric: len(metric[1]), reverse=True)
     if self.verbose:

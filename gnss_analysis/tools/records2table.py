@@ -184,7 +184,7 @@ class StoreToHDF5(object):
         prn = s.sid if msg.msg_type is tr.SBP_MSG_TRACKING_STATE else s.prn
         d['host_offset'] = host_offset
         d['host_time'] = host_time
-        if s.prn in self.rover_tracking:
+        if prn in self.rover_tracking:
           self.rover_tracking[prn].update({host_offset: d})
         else:
           self.rover_tracking[prn] = {host_offset: d}
