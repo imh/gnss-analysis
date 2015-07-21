@@ -108,6 +108,10 @@ def get_gps_time_col(store, tabs, gpst_col='approx_gps_time', verbose=False):
       print "Interpolating approx_gps_time for %s." % tab
     if tab not in store:
       warnings.warn("%s not found in Pandas table" % tab, UserWarning)
+    if store[tab].empty:
+      if verbose:
+        print "%s is empty." % tab
+      continue
     elif isinstance(store[tab], pd.DataFrame):
       dft = store[tab].T
       dft[gpst_col] = store[tab].T.host_offset.apply(f)

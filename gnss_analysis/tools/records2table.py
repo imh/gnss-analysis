@@ -65,6 +65,14 @@ warnings.filterwarnings('ignore', category=pd.io.pytables.PerformanceWarning)
 # deterministic sequence count offset for each run of coincident logs.
 SEQ_INTERVAL = 0.05
 
+def _is_nested(attr):
+  return len(attr.keys()) > 0 and isinstance(attr[attr.keys()[0]], dict)
+
+def dict_depth(d, depth=0):
+  if not isinstance(d, dict) or not d:
+    return depth
+  return max(dict_depth(v, depth + 1) for k, v in d.iteritems())
+
 class StoreToHDF5(object):
   """Stores observations as HDF5.
 
@@ -198,7 +206,7 @@ class StoreToHDF5(object):
       self.rover_iar_state[host_offset] = m
 
   def _process_log(self, host_offset, host_time, msg):
-    if type(msg) is lg.MsgPrint:
+    if type(msg) in [lg.MsgLog, lg.MsgPrintDep]:
       m = exclude_fields(msg)
       self.log_seq = self.log_seq + 1 if host_offset in self.rover_logs else 0
       m['host_offset'] = host_offset + SEQ_INTERVAL*self.log_seq
@@ -282,23 +290,31 @@ class StoreToHDF5(object):
       os.unlink(filename)
     try:
       f = pd.HDFStore(filename, mode='w')
-      f.put('base_obs', pd.Panel(self.base_obs))
-      f.put('base_obs_integrity', pd.DataFrame(self.base_obs_integrity))
-      f.put('rover_obs', pd.Panel(self.rover_obs))
-      f.put('rover_obs_integrity', pd.DataFrame(self.rover_obs_integrity))
-      f.put('ephemerides', pd.Panel(self.ephemerides))
-      f.put('rover_ephemerides', pd.Panel(self.rover_ephemerides))
-      f.put('base_ephemerides', pd.Panel(self.base_ephemerides))
-      f.put('rover_spp', pd.DataFrame(self.rover_spp))
-      f.put('rover_llh', pd.DataFrame(self.rover_llh))
-      f.put('rover_rtk_ned', pd.DataFrame(self.rover_rtk_ned))
-      f.put('rover_rtk_ecef', pd.DataFrame(self.rover_rtk_ecef))
-      f.put('rover_tracking', pd.Panel(self.rover_tracking))
-      f.put('rover_iar_state', pd.DataFrame(self.rover_iar_state))
-      f.put('rover_logs', pd.DataFrame(self.rover_logs))
-      f.put('rover_thread_state', pd.Panel(self.rover_thread_state))
-      f.put('rover_uart_state', pd.Panel(self.rover_uart_state))
-      f.put('rover_acq', pd.Panel(self.rover_acq))
+      tabs = ['base_obs',
+              'base_obs_integrity',
+              'rover_obs',
+              'rover_obs_integrity',
+              'ephemerides',
+              'rover_ephemerides',
+              'base_ephemerides',
+              'rover_spp',
+              'rover_llh',
+              'rover_rtk_ned',
+              'rover_rtk_ecef',
+              'rover_tracking',
+              'rover_iar_state',
+              'rover_logs',
+              'rover_thread_state',
+              'rover_uart_state',
+              'rover_acq']
+      for tab in tabs:
+        attr = getattr(self, tab)
+        if dict_depth(attr) == 3:
+          f.put(tab, pd.Panel(attr))
+        else:
+          f.put(tab, pd.DataFrame(attr))
+        if f.get(tab).empty:
+          warnings.warn('%s is empty.' % tab)
     finally:
       f.close()
 
