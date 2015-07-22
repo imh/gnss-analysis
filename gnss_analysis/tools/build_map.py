@@ -13,9 +13,14 @@
 
 """
 
+from sbp.client.loggers.json_logger import JSONLogIterator
+from sbp.utils import exclude_fields
 import argparse
+import sbp.navigation as nav
+import os
 import pandas as pd
 import sys
+import warnings
 
 
 def get_kml_doc(llhs):
@@ -60,6 +65,33 @@ def write_kml(llhs, fname='file.kml'):
   with open(fname,'w+') as f:
     f.write(doc_str)
 
+def output_spp(spp, log_datafile, is_kml):
+  if is_kml:
+    output_filename = log_datafile + '-all-spp.kml'
+    print "Outputting spp, if available, to", output_filename
+    write_kml(spp, output_filename)
+  pseudo_spp = spp[spp.flags == 1]
+  if is_kml and not pseudo_spp.empty:
+    output_filename = log_datafile + '-pseudo-spp.kml'
+    print "Outputting pseudo-absolute spp, if available, to", output_filename
+    write_kml(pseudo_spp, output_filename)
+
+def process_hdf(log_datafile, is_kml):
+  with pd.HDFStore(log_datafile) as store:
+    if not store.rover_llh.empty:
+      output_spp(store.rover_llh.T, log_datafile, is_kml)
+    else:
+      warnings.warn("No single-point solutions available plotting.")
+
+def process_json(log_datafile, is_kml):
+  with JSONLogIterator(log_datafile) as log:
+    rover_llh = {}
+    for delta, timestamp, msg in log.next():
+      if type(msg) is nav.MsgPosLLH:
+        m = exclude_fields(msg)
+        rover_llh[delta] = m
+    output_spp(pd.DataFrame(rover_llh).T, log_datafile, is_kml)
+
 def main():
   parser = argparse.ArgumentParser(description='Swift Nav SBP log to HDF5 table tool.')
   parser.add_argument('file',
@@ -69,26 +101,15 @@ def main():
                       help='Output to KML.')
   args = parser.parse_args()
   log_datafile = args.file
-  with pd.HDFStore(log_datafile) as store:
-    try:
-      if not store.rover_llh.empty:
-        spp = store.rover_llh.T
-        if args.kml:
-          output_filename = log_datafile + '-all-spp.kml'
-          print "Outputting spp, if available, to", output_filename
-          write_kml(spp, output_filename)
-        pseudo_spp = spp[spp.flags == 1]
-        if args.kml and not pseudo_spp.empty:
-          output_filename = log_datafile + '-pseudo-spp.kml'
-          print "Outputting pseudo-absolute spp, if available, to", output_filename
-          write_kml(pseudo_spp, output_filename)
-      else:
-        raise Exception("No single-point solutions available plotting.")
-    except (KeyboardInterrupt, SystemExit):
-      print "Exiting!"
-      sys.exit()
-    finally:
-      store.close()
+  log_filename, log_ext = os.path.splitext(log_datafile)
+  if log_ext is '.csv':
+    raise Exception("Not implemented: %s." % log_ext)
+  elif log_ext in ['.hdf', '.hdf5', '.h5']:
+    process_hdf(log_datafile, args.kml)
+  elif log_ext == '.json':
+    process_json(log_datafile, args.kml)
+  else:
+    raise Exception("Invalid file extension: %s." % log_ext)
 
 if __name__ == "__main__":
   main()
