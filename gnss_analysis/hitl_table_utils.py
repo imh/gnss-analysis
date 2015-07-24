@@ -448,6 +448,26 @@ def mark_sat_mask(t):
   return prefix_match_text(t.rover_logs, "INFO: Mask")
 
 
+def mark_prn_synced(t):
+  return prefix_match_text(t.rover_logs, "INFO: PRN \d+ synced")
+
+
+def mark_pll_stress(t):
+  return prefix_match_text(t.rover_logs, "INFO: PRN \d+ PLL stress")
+
+
+def mark_subframe_mismatch1(t):
+  return prefix_match_text(t.rover_logs, "INFO: PRN \d+ subframe parity mismatch")
+
+
+def mark_acq_timeout(t):
+  return prefix_match_text(t.rover_logs, "INFO: acq: Sample load timeout")
+
+
+def mark_sat_unhealthy(t):
+  return prefix_match_text(t.rover_logs, "INFO: PRN \d+ unhealthy")
+
+
 def mark_ephemeris_diffs(ephemerides):
   ts = []
   for sat in ephemerides.items:
@@ -668,6 +688,11 @@ class Plotter(object):
             ('mark_weird', mark_weird(self.hitl_log)['text']),
             ('mark_dgnss_update_warn', mark_dgnss_update_warn(self.hitl_log)['text']),
             ('mark_packet_drop', mark_packet_drop(self.hitl_log)['text']),
+            ('mark_prn_synced', mark_prn_synced(self.hitl_log)['text']),
+            ('mark_pll_stress', mark_pll_stress(self.hitl_log)['text']),
+            ('mark_subframe_mismatch1', mark_subframe_mismatch1(self.hitl_log)['text']),
+            ('mark_acq_timeout', mark_acq_timeout(self.hitl_log)['text']),
+            ('mark_sat_unhealthy', mark_sat_unhealthy(self.hitl_log)['text']),
             ('mark_sat_mask', mark_sat_mask(self.hitl_log)['text'])]
     self.anns = dict(anns)
     sorted_anns = sorted(anns, key=lambda metric: len(metric[1]), reverse=True)
