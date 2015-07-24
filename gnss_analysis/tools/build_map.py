@@ -66,14 +66,23 @@ def write_kml(llhs, fname='file.kml'):
     f.write(doc_str)
 
 def output_spp(spp, log_datafile, is_kml):
-  if is_kml:
-    output_filename = log_datafile + '-all-spp.kml'
-    print "Outputting spp, if available, to", output_filename
-    write_kml(spp, output_filename)
+  output_filename = log_datafile + '-all-spp.kml'
+  print "Outputting spp (including rtk) to", output_filename
+  write_kml(spp, output_filename)
+  pseudo_spp = spp[spp.flags == 0]
+  if not pseudo_spp.empty:
+    output_filename = log_datafile + '-spp-no-rtk.kml'
+    print "Outputting spp (no rtk) to", output_filename
+    write_kml(pseudo_spp, output_filename)
   pseudo_spp = spp[spp.flags == 1]
-  if is_kml and not pseudo_spp.empty:
-    output_filename = log_datafile + '-pseudo-spp.kml'
-    print "Outputting pseudo-absolute spp, if available, to", output_filename
+  if not pseudo_spp.empty:
+    output_filename = log_datafile + '-pseudo-spp-fixed-rtk.kml'
+    print "Outputting pseudo-absolute spp (fixed rtk only) to", output_filename
+    write_kml(pseudo_spp, output_filename)
+  pseudo_spp = spp[spp.flags == 2]
+  if not pseudo_spp.empty:
+    output_filename = log_datafile + '-pseudo-spp-float-rtk.kml'
+    print "Outputting pseudo-absolute spp (float rtk only) to", output_filename
     write_kml(pseudo_spp, output_filename)
 
 def process_hdf(log_datafile, is_kml):
