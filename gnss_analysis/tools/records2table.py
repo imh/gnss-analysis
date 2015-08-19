@@ -325,11 +325,11 @@ def hdf5_write(log_datafile, filename, verbose=False):
   logging_interval = 10000
   start = time.time()
   with JSONLogIterator(log_datafile) as log:
-    for delta, timestamp, msg in log.next():
+    for msg, data in log.next():
       i += 1
       if verbose and i % logging_interval == 0:
         print "Processed %d records! @ %.1f sec." % (i, time.time() - start)
-      processor.process_message(delta, timestamp, msg)
+      processor.process_message(data['delta'],  data['timestamp'], msg)
     print "Processed %d records!" % i
     processor.save(filename)
   return filename
@@ -362,12 +362,12 @@ def main():
   logging_interval = 10000
   start = time.time()
   with JSONLogIterator(log_datafile) as log:
-    for delta, timestamp, msg in log.next():
+    for msg, data in log.next():
       i += 1
       if i % logging_interval == 0:
         print "Processed %d records! @ %.1f sec." \
           % (i, time.time() - start)
-      processor.process_message(delta, timestamp, msg)
+      processor.process_message(data['delta'], data['timestamp'], msg)
       if num_records is not None and i >= int(num_records):
         print "Processed %d records!" % i
         break
