@@ -9,7 +9,7 @@
 # EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE IMPLIED
 # WARRANTIES OF MERCHANTABILITY AND/OR FITNESS FOR A PARTICULAR PURPOSE.
 
-from gnss_analysis.tools.records2table import StoreToHDF5
+from gnss_analysis.tools.records2table import StoreToHDF5, hdf5_write
 from numpy import nan
 from pandas.tslib import Timestamp
 from sbp.client.loggers.json_logger import JSONLogIterator
@@ -23,10 +23,7 @@ def test_hdf5():
     = "./data/serial_link_log_20150314-190228_dl_sat_fail_test1.log.json.dat"
   filename = log_datafile + ".hdf5"
   processor = StoreToHDF5()
-  with JSONLogIterator(log_datafile) as log:
-    for delta, timestamp, msg in log.next():
-      processor.process_message(delta, timestamp, msg)
-    processor.save(filename)
+  hdf5_write(log_datafile, filename)
   assert os.path.isfile(filename)
   with pd.HDFStore(filename) as store:
     assert store
@@ -140,7 +137,7 @@ def test_hdf5():
            'x': -2704370.9813769697}}
     assert isinstance(store.rover_tracking, pd.Panel)
     assert store.rover_tracking.shape == (19, 5, 318)
-    rd = store.rover_tracking[0, :, :].to_dict()
+    rd = store.rover_tracking[:, :, 0].to_dict()
     assert rd.keys() == [0, 4, 6, 7, 8, 9, 10, 11, 12, 13, 14,
                          16, 18, 19, 20, 21, 25, 27, 29]
     assert rd[0] \
