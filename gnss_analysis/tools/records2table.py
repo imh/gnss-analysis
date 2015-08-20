@@ -65,6 +65,26 @@ warnings.filterwarnings('ignore', category=pd.io.pytables.PerformanceWarning)
 # deterministic sequence count offset for each run of coincident logs.
 SEQ_INTERVAL = 0.05
 
+SPECIALLY_HANDLED_TYPES = [ob.MsgObs,
+                           ob.MsgObsDepA,
+                           ob.MsgEphemeris,
+                           ob.MsgEphemerisDepA,
+                           ob.MsgEphemerisDepB,
+                           nav.MsgPosECEF,
+                           nav.MsgPosLLH,
+                           nav.MsgBaselineNED,
+                           nav.MsgBaselineECEF,
+                           tr.MsgTrackingState,
+                           tr.MsgTrackingStateDepA,
+                           piksi.MsgIarState,
+                           lg.MsgLog,
+                           lg.MsgPrintDep,
+                           piksi.MsgThreadState,
+                           piksi.MsgUartState,
+                           acq.MsgAcqResult,
+                           acq.MsgAcqResultDepA
+                           ]
+
 def _is_nested(attr):
   return len(attr.keys()) > 0 and isinstance(attr[attr.keys()[0]], dict)
 
@@ -99,6 +119,7 @@ class StoreToHDF5(object):
     self.rover_acq = {}
     self.log_seq = 0
     self.time = None
+    self.generic_msgs = {}
 
   def _process_obs(self, host_offset, host_time, msg):
     if type(msg) in [ob.MsgObs, ob.MsgObsDepA]:
@@ -230,7 +251,7 @@ class StoreToHDF5(object):
   def _process_uart_state(self, host_offset, host_time, msg):
     if type(msg) is piksi.MsgUartState:
       m = exclude_fields(msg)
-      for i in ['uart_a', 'uart_b']:
+      for i in ['uart_a', 'uart_b' ,'uart_ftdi']:
         n = walk_json_dict(m[i])
         n['host_offset'] = host_offset
         n['host_time'] = host_time
@@ -260,9 +281,11 @@ class StoreToHDF5(object):
       else:
         self.rover_acq[prn] = {host_offset: m}
 
-  def process_message(self, host_offset, host_time, msg):
-    """Dispatches specific message types to the appropriate
-    tables.
+  def _process_generic(self, host_offset, host_time, msg):
+    """
+    Generically adds messages to the self.generic_msgs dict
+
+    key for generic_msgs is the class name for the message
 
     Parameters
     ----------
@@ -274,15 +297,47 @@ class StoreToHDF5(object):
       SBP message payload
 
     """
-    self._process_acq(host_offset, host_time, msg)
-    self._process_eph(host_offset, host_time, msg)
-    self._process_iar(host_offset, host_time, msg)
-    self._process_log(host_offset, host_time, msg)
-    self._process_obs(host_offset, host_time, msg)
-    self._process_pos(host_offset, host_time, msg)
-    self._process_tracking(host_offset, host_time, msg)
-    self._process_thread_state(host_offset, host_time, msg)
-    self._process_uart_state(host_offset, host_time, msg)
+    m = exclude_fields(msg)
+    m['host_offset'] = host_offset
+    m['host_time'] = host_time
+    key = msg.__class__.__name__
+    msg_dict = self.generic_msgs.get(key, {})
+    msg_dict.update({m['host_offset'] : m})
+    self.generic_msgs[key] = msg_dict
+
+
+
+  def process_message(self, host_offset, host_time, msg):
+    """Dispatches specific message types to the appropriate
+    tables.
+
+    The SPECIALLY_HANDLED_TYPES list decides whether a msg
+    is uniquely processed.  We'd like MsgGPSTime to be used
+    for other message timestamps and to be stored as a table
+
+    Parameters
+    ----------
+    host_offset : int
+      Millisecond offset since beginning of log.
+    host_time : int
+      Host UNIX epoch (UTC)
+    msg : SBP message
+      SBP message payload
+
+    """
+    if type(msg) in SPECIALLY_HANDLED_TYPES + [nav.MsgGPSTime]:
+      self._process_acq(host_offset, host_time, msg)
+      self._process_eph(host_offset, host_time, msg)
+      self._process_iar(host_offset, host_time, msg)
+      self._process_log(host_offset, host_time, msg)
+      self._process_obs(host_offset, host_time, msg)
+      self._process_pos(host_offset, host_time, msg)
+      self._process_tracking(host_offset, host_time, msg)
+      self._process_thread_state(host_offset, host_time, msg)
+      self._process_uart_state(host_offset, host_time, msg)
+    else:
+      self._process_generic(host_offset, host_time, msg)
+
 
   def save(self, filename):
     if os.path.exists(filename):
@@ -315,6 +370,16 @@ class StoreToHDF5(object):
           f.put(tab, pd.DataFrame(attr))
         if f.get(tab).empty:
           warnings.warn('%s is empty.' % tab)
+      # For each generic message we add a column whose
+      # name comes from the Msg's class name
+      for eachkey in self.generic_msgs.iterkeys():
+        msgdict = self.generic_msgs.get(eachkey, {})
+        f.put(eachkey, pd.DataFrame(msgdict))
+        if f.get(eachkey).empty:
+           warnings.warn('%s is empty.' % eachkey)
+    except:
+      import traceback
+      print traceback.format_exc()
     finally:
       f.close()
 
